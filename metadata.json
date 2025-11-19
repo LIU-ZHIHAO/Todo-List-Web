@@ -1,0 +1,5 @@
+{
+  "name": "Eisenhower Matrix Todo",
+  "description": "A Glassmorphism-styled Eisenhower Matrix task manager with local IndexedDB persistence, history tracking, and calendar views.",
+  "requestFramePermissions": []
+}
