@@ -60,8 +60,8 @@ const TechButton = ({ onClick, icon: Icon, label, colorClass, ringClass, glowCla
     onClick={onClick} 
     className="group pointer-events-auto relative w-14 h-14 flex items-center justify-center transition-all duration-500 hover:scale-110 active:scale-95 flex-shrink-0"
   >
-     {/* Text Label (Top) */}
-     <div className={`absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-mono tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 whitespace-nowrap ${glowClass} text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50 pointer-events-none`}>
+     {/* Text Label (Top) - Reverted to simpler style */}
+     <div className={`absolute -top-9 left-1/2 -translate-x-1/2 text-xs font-bold tracking-wide opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-y-2 group-hover:translate-y-0 whitespace-nowrap ${glowClass} text-white drop-shadow-md pointer-events-none`}>
         {label}
      </div>
      
@@ -379,11 +379,11 @@ export default function App() {
         <main className="flex-1 w-[75%] max-w-[75%] flex flex-col h-full relative z-10 bg-slate-900/10 backdrop-blur-[2px]">
            
            {/* Top Section: Header + Controls */}
-           {/* ADJUSTED: Height to 34% to give more vertical breathing room */}
-           <div className="h-[34%] flex flex-col w-full relative pt-4">
+           {/* Layout: Reverted to center alignment (items-center), removed extra top padding */}
+           <div className="h-[34%] flex flex-col w-full relative">
                
                {/* 1. Header */}
-               <header className="flex-shrink-0 flex items-center justify-center px-8 relative z-20 h-10 mb-1">
+               <header className="flex-shrink-0 flex items-center justify-center px-8 relative z-20 h-10 mb-1 pt-4">
                   <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.4)] ring-1 ring-white/20">
                           <LayoutGrid size={18} className="text-white" />
@@ -394,7 +394,7 @@ export default function App() {
                   </div>
 
                   {/* Author & Sync Status */}
-                  <div className="absolute right-8 top-1/2 -translate-y-1/2 flex items-center gap-3">
+                  <div className="absolute right-8 top-1/2 translate-y-1 flex items-center gap-3">
                     <button onClick={() => setIsAuthorModalOpen(true)} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-300 hover:bg-white/5 transition-colors" title="志豪的设计作品">
                         <Info size={16} />
                     </button>
@@ -412,7 +412,7 @@ export default function App() {
                </header>
 
                {/* 2. Bottom Control Row: Button | Input+Stream | Button */}
-               {/* ADJUSTED: items-center for vertical centering, justify-center for center column, removed bottom padding */}
+               {/* Adjusted: items-center (vertical center), removed pt-6 */}
                <div className="flex-1 flex items-center justify-between px-8 lg:px-16 gap-4 overflow-hidden">
                     
                     {/* Left Button */}
@@ -428,7 +428,6 @@ export default function App() {
                     </div>
                     
                     {/* Center Column: Input & Stream */}
-                    {/* ADJUSTED: justify-center to float in the middle */}
                     <div className="flex flex-col items-center justify-center w-full max-w-xl mx-auto gap-3 z-20">
                         
                          {/* Input */}
@@ -446,7 +445,7 @@ export default function App() {
                             />
                         </div>
 
-                        {/* Stream - Size kept as requested */}
+                        {/* Stream */}
                         <div className="w-full h-[12.5rem] relative overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)] flex items-center">
                              <div className="w-full animate-scroll-vertical flex flex-col items-center space-y-3" style={{ animationDuration: '80s' }}>
                                 {[...scrollingNotes, ...scrollingNotes].map((text, i) => (
@@ -475,7 +474,6 @@ export default function App() {
            </div>
 
            {/* Bottom Section: Quadrants */}
-           {/* ADJUSTED: Height to 66% */}
            <div className="h-[66%] p-6 pt-0 overflow-hidden">
                <div className="h-full rounded-3xl border border-white/5 bg-black/20 p-1 shadow-2xl">
                   {loading ? (
@@ -484,8 +482,8 @@ export default function App() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-1 h-full">
                       {renderQuadrant(Quadrant.Q2)}
                       {renderQuadrant(Quadrant.Q1)}
-                      {renderQuadrant(Quadrant.Q4)}
                       {renderQuadrant(Quadrant.Q3)}
+                      {renderQuadrant(Quadrant.Q4)}
                     </div>
                   )}
                </div>

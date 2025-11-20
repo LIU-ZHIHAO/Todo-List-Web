@@ -1,3 +1,5 @@
+
+
 export enum Quadrant {
   Q1 = 'Q1', // Urgent & Important
   Q2 = 'Q2', // Not Urgent & Important
@@ -72,15 +74,15 @@ export const QUADRANT_INFO = {
   [Quadrant.Q2]: {
     label: '重要不紧急',
     description: '计划做',
-    color: 'text-blue-400',
-    bgColor: 'bg-blue-500/10',
-    borderColor: 'border-blue-500/30',
-    dotColor: 'bg-blue-500',
-    gradient: 'from-blue-500/20 to-blue-900/20'
+    color: 'text-emerald-400', // Changed to Green
+    bgColor: 'bg-emerald-500/10',
+    borderColor: 'border-emerald-500/30',
+    dotColor: 'bg-emerald-500',
+    gradient: 'from-emerald-500/20 to-emerald-900/20'
   },
   [Quadrant.Q3]: {
-    label: '紧急不重要',
-    description: '授权做',
+    label: '不重要不紧急',
+    description: '减少做', // Changed text
     color: 'text-yellow-400',
     bgColor: 'bg-yellow-500/10',
     borderColor: 'border-yellow-500/30',
@@ -88,12 +90,12 @@ export const QUADRANT_INFO = {
     gradient: 'from-yellow-500/20 to-yellow-900/20'
   },
   [Quadrant.Q4]: {
-    label: '不重要不紧急',
-    description: '稍后做',
-    color: 'text-emerald-400',
-    bgColor: 'bg-emerald-500/10',
-    borderColor: 'border-emerald-500/30',
-    dotColor: 'bg-emerald-500',
-    gradient: 'from-emerald-500/20 to-emerald-900/20'
+    label: '紧急不重要',
+    description: '授权做', // Changed text, changed to Blue
+    color: 'text-blue-400', 
+    bgColor: 'bg-blue-500/10',
+    borderColor: 'border-blue-500/30',
+    dotColor: 'bg-blue-500',
+    gradient: 'from-blue-500/20 to-blue-900/20'
   },
 };
