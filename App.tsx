@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { Plus, History as HistoryIcon, CheckCircle2, Sparkles, Zap, LayoutGrid, Info, Trash2, Settings, Sun, Moon } from 'lucide-react';
+import { Plus, History as HistoryIcon, CheckCircle2, Sparkles, Zap, LayoutGrid, Info, Trash2, Settings, Sun, Moon, HelpCircle } from 'lucide-react';
 import { Task, Quadrant, QuickNote, QUADRANT_INFO, SortConfig } from './types';
 import { dbService } from './services/db';
 import { TaskCard } from './components/TaskCard';
@@ -8,6 +8,7 @@ import { AddTaskModal } from './components/AddTaskModal';
 import { HistoryModal } from './components/HistoryModal';
 import { AuthorModal } from './components/AuthorModal';
 import { SettingsModal } from './components/SettingsModal';
+import { HelpModal } from './components/HelpModal';
 
 const APP_VERSION = '1.1.0';
 
@@ -145,6 +146,7 @@ export default function App() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isAuthorModalOpen, setIsAuthorModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
   const [quickNoteInput, setQuickNoteInput] = useState('');
@@ -430,10 +432,10 @@ export default function App() {
         onDragOver={(e) => e.preventDefault()}
         onDragEnter={(e) => handleDragEnter(e, q)}
         onDrop={(e) => handleDrop(e, q)}
-        className={`flex flex-col h-full rounded-2xl border backdrop-blur-sm p-4 transition-all duration-500 group relative overflow-hidden cursor-pointer
+        className={`flex flex-col h-full rounded-2xl border backdrop-blur-sm p-4 transition-all duration-300 group relative overflow-hidden cursor-pointer
           ${isOver 
-             ? `border-${info.color.split('-')[1]}-400 shadow-[0_0_30px_rgba(255,255,255,0.15)] scale-[1.01] bg-white/60 dark:bg-${info.color.split('-')[1]}-900/20` 
-             : 'bg-white/40 border-white/40 hover:shadow-lg hover:bg-white/60 dark:bg-white/5 dark:border-white/5 dark:hover:shadow-lg dark:hover:shadow-white/5'
+             ? `border-${info.color.split('-')[1]}-400 shadow-lg scale-[1.01] ${info.bgColor.replace('/80', '/90')} dark:bg-${info.color.split('-')[1]}-900/30` 
+             : `${info.bgColor} ${info.borderColor} hover:shadow-md hover:scale-[1.005]`
           }
         `}
       >
@@ -444,19 +446,19 @@ export default function App() {
           <div>
             <h2 className="text-2xl font-bold tracking-tight relative">
                <span className={`absolute -inset-1 blur-md ${info.color} opacity-10 dark:opacity-20`}></span>
-               {/* Title Color: Dark Text in Light Mode */}
-               <span className={`relative text-slate-800 dark:${info.color}`}>{info.label}</span>
+               {/* Title Color: Uses specific quadrant color text for clean visibility */}
+               <span className={`relative ${info.color}`}>{info.label}</span>
             </h2>
             <p className="text-sm text-slate-500 dark:text-gray-400 mt-1 font-medium tracking-wide">{info.description}</p>
           </div>
-          <span className={`px-2.5 py-1 rounded-lg text-xs font-bold bg-white/50 dark:bg-white/10 text-slate-600 dark:${info.color} border border-white/30 dark:border-white/5 shadow-sm`}>
+          <span className={`px-2.5 py-1 rounded-lg text-xs font-bold bg-white/60 dark:bg-white/10 ${info.color} border border-white/30 dark:border-white/5 shadow-sm`}>
             {qTasks.length}
           </span>
         </div>
         
         <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar pr-1 relative z-10 pb-2">
           {qTasks.length === 0 && !isOver ? (
-            <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-gray-500/40 border-2 border-dashed border-slate-300 dark:border-gray-500/10 rounded-xl p-4 select-none hover:border-slate-400 dark:hover:border-gray-500/20 transition-colors">
+            <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-gray-500/40 border-2 border-dashed border-slate-300/50 dark:border-gray-500/10 rounded-xl p-4 select-none transition-colors">
               <Plus size={24} className="mb-2 opacity-50" />
               <span className="text-xs font-medium">点击空白处新建任务</span>
             </div>
@@ -485,7 +487,7 @@ export default function App() {
         </div>
         
         {/* Gradient Overlay: Subtle in Light Mode */}
-        <div className={`absolute inset-0 pointer-events-none bg-gradient-to-br from-white/0 to-white/0 dark:${info.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-700`}></div>
+        <div className={`absolute inset-0 pointer-events-none bg-gradient-to-br from-white/0 to-white/0 dark:${info.gradient} opacity-100 transition-opacity duration-700`}></div>
       </div>
     );
   };
@@ -551,6 +553,15 @@ export default function App() {
                         title={theme === 'dark' ? "切换亮色模式" : "切换深色模式"}
                     >
                         {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                    </button>
+
+                    {/* Help Button */}
+                    <button 
+                        onClick={() => setIsHelpOpen(true)} 
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-slate-200/50 dark:text-gray-400 dark:hover:text-blue-300 dark:hover:bg-white/5 transition-colors" 
+                        title="使用说明"
+                    >
+                        <HelpCircle size={16} />
                     </button>
 
                     <button onClick={() => setIsAuthorModalOpen(true)} className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-slate-200/50 dark:text-gray-400 dark:hover:text-blue-300 dark:hover:bg-white/5 transition-colors" title="志豪的设计作品">
@@ -636,8 +647,8 @@ export default function App() {
 
            {/* Bottom Section: Quadrants */}
            <div className="h-[66%] p-6 pt-0 overflow-hidden">
-               {/* Quadrant Container Background: Light Mode is very clean/white, Dark Mode is glass */}
-               <div className="h-full rounded-3xl border border-slate-200 dark:border-white/5 bg-slate-100/50 dark:bg-black/20 p-1 shadow-xl dark:shadow-2xl backdrop-blur-md transition-colors duration-500">
+               {/* Quadrant Container Background: Transparent/Subtle to let quadrant colors shine */}
+               <div className="h-full rounded-3xl border border-slate-200 dark:border-white/5 bg-white/20 dark:bg-black/20 p-1 shadow-xl dark:shadow-2xl backdrop-blur-md transition-colors duration-500">
                   {loading ? (
                     <div className="flex items-center justify-center h-full text-gray-400 gap-2">
                          <div className="w-5 h-5 rounded-full border-2 border-blue-500/30 border-t-blue-500 animate-spin"></div>
@@ -698,6 +709,11 @@ export default function App() {
         onUpdate={(newConfig) => setSortConfig(newConfig)}
       />
       
+      <HelpModal
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
+      />
+
       <AddTaskModal 
         isOpen={isTaskModalOpen} 
         onClose={() => setIsTaskModalOpen(false)} 

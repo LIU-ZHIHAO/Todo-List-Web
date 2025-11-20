@@ -1,5 +1,4 @@
 
-
 export enum Quadrant {
   Q1 = 'Q1', // Urgent & Important
   Q2 = 'Q2', // Not Urgent & Important
@@ -73,37 +72,37 @@ export const QUADRANT_INFO = {
   [Quadrant.Q1]: {
     label: '重要且紧急',
     description: '马上做',
-    color: 'text-red-400',
-    bgColor: 'bg-red-500/10',
-    borderColor: 'border-red-500/30',
+    color: 'text-red-600 dark:text-red-400',
+    bgColor: 'bg-red-50/80 dark:bg-red-500/10',
+    borderColor: 'border-red-200/80 dark:border-red-500/30',
     dotColor: 'bg-red-500',
-    gradient: 'from-red-500/20 to-red-900/20'
+    gradient: 'from-red-500/5 to-red-900/5 dark:from-red-500/20 dark:to-red-900/20'
   },
   [Quadrant.Q2]: {
     label: '重要不紧急',
     description: '计划做',
-    color: 'text-emerald-400', // Changed to Green
-    bgColor: 'bg-emerald-500/10',
-    borderColor: 'border-emerald-500/30',
+    color: 'text-emerald-600 dark:text-emerald-400', // Green
+    bgColor: 'bg-emerald-50/80 dark:bg-emerald-500/10',
+    borderColor: 'border-emerald-200/80 dark:border-emerald-500/30',
     dotColor: 'bg-emerald-500',
-    gradient: 'from-emerald-500/20 to-emerald-900/20'
+    gradient: 'from-emerald-500/5 to-emerald-900/5 dark:from-emerald-500/20 dark:to-emerald-900/20'
   },
   [Quadrant.Q3]: {
     label: '不重要不紧急',
-    description: '减少做', // Changed text
-    color: 'text-yellow-400',
-    bgColor: 'bg-yellow-500/10',
-    borderColor: 'border-yellow-500/30',
+    description: '减少做',
+    color: 'text-yellow-600 dark:text-yellow-400',
+    bgColor: 'bg-yellow-50/80 dark:bg-yellow-500/10',
+    borderColor: 'border-yellow-200/80 dark:border-yellow-500/30',
     dotColor: 'bg-yellow-500',
-    gradient: 'from-yellow-500/20 to-yellow-900/20'
+    gradient: 'from-yellow-500/5 to-yellow-900/5 dark:from-yellow-500/20 dark:to-yellow-900/20'
   },
   [Quadrant.Q4]: {
     label: '紧急不重要',
-    description: '授权做', // Changed text, changed to Blue
-    color: 'text-blue-400', 
-    bgColor: 'bg-blue-500/10',
-    borderColor: 'border-blue-500/30',
+    description: '授权做',
+    color: 'text-blue-600 dark:text-blue-400', 
+    bgColor: 'bg-blue-50/80 dark:bg-blue-500/10',
+    borderColor: 'border-blue-200/80 dark:border-blue-500/30',
     dotColor: 'bg-blue-500',
-    gradient: 'from-blue-500/20 to-blue-900/20'
+    gradient: 'from-blue-500/5 to-blue-900/5 dark:from-blue-500/20 dark:to-blue-900/20'
   },
 };
