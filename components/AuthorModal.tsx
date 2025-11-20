@@ -42,7 +42,7 @@ export const AuthorModal: React.FC<AuthorModalProps> = ({ isOpen, onClose, versi
                 </div>
                 <div className="text-left">
                     <div className="text-xs text-slate-500">联系微信</div>
-                    <div className="text-sm text-slate-700 dark:text-gray-200">zhihao779</div>
+                    <div className="text-sm text-slate-700 dark:text-gray-200">zhihao779（加好友请备注来意）</div>
                 </div>
             </div>
              <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-default group">

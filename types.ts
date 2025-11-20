@@ -50,7 +50,7 @@ export interface SortConfig {
 }
 
 export type StreamMode = 'static' | 'scroll' | 'hidden';
-export type StreamSpeed = 'slow' | 'medium' | 'fast';
+export type StreamSpeed = number; // Pixels per second (e.g., 20 to 150)
 
 export interface StreamConfig {
   mode: StreamMode;

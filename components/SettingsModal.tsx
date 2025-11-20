@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Modal } from './ui/Modal';
 import { SortConfig, SortMode, SortDirection, StreamConfig, StreamMode, StreamSpeed } from '../types';
-import { GripVertical, Calendar, Percent, ArrowUpNarrowWide, ArrowDownNarrowWide, PauseCircle, PlayCircle, EyeOff, AlertTriangle, Trash2, RefreshCw, Rabbit, Turtle, Zap } from 'lucide-react';
+import { GripVertical, Calendar, Percent, ArrowUpNarrowWide, ArrowDownNarrowWide, PauseCircle, PlayCircle, EyeOff, AlertTriangle, Trash2, RefreshCw, Gauge } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -29,7 +29,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
     onUpdateStream({ ...streamConfig, mode });
   };
 
-  const handleStreamSpeedChange = (speed: StreamSpeed) => {
+  const handleStreamSpeedChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const speed = parseInt(e.target.value, 10);
     onUpdateStream({ ...streamConfig, speed });
   };
 
@@ -136,41 +137,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
 
                    {streamConfig.mode === 'static' && (
                         <div className="text-xs text-slate-500 dark:text-gray-400 bg-slate-50 dark:bg-white/5 p-2 rounded-lg text-center animate-in fade-in">
-                            每10秒自动轮播更换展示内容
+                            每10秒自动轮播更换展示内容，铺满侧边栏
                         </div>
                    )}
 
                    {streamConfig.mode === 'scroll' && (
-                       <div className="flex items-center gap-2 bg-slate-50 dark:bg-white/5 p-1 rounded-lg animate-in fade-in">
-                           {[
-                               { id: 'slow', icon: Turtle, label: '慢' },
-                               { id: 'medium', icon: Rabbit, label: '中' },
-                               { id: 'fast', icon: Zap, label: '快' },
-                           ].map((speed) => (
-                               <button
-                                   key={speed.id}
-                                   onClick={() => handleStreamSpeedChange(speed.id as StreamSpeed)}
-                                   className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-bold transition-all
-                                       ${streamConfig.speed === speed.id
-                                           ? 'bg-white dark:bg-purple-600 text-purple-600 dark:text-white shadow-sm'
-                                           : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200'
-                                       }
-                                   `}
-                               >
-                                   <speed.icon size={12} />
-                                   {speed.label}
-                               </button>
-                           ))}
+                       <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-xl animate-in fade-in border border-slate-100 dark:border-white/5">
+                           <div className="flex items-center justify-between mb-2">
+                               <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-gray-400">
+                                   <Gauge size={14} /> 滚动速度
+                               </div>
+                               <span className="text-xs font-mono text-purple-600 dark:text-purple-400">{streamConfig.speed} px/s</span>
+                           </div>
+                           <input 
+                                type="range" 
+                                min="20" 
+                                max="150" 
+                                step="5"
+                                value={typeof streamConfig.speed === 'number' ? streamConfig.speed : 50}
+                                onChange={handleStreamSpeedChange}
+                                className="w-full h-2 bg-slate-200 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                           />
+                           <div className="flex justify-between mt-1 text-[10px] text-slate-400 uppercase font-bold">
+                               <span>Slow</span>
+                               <span>Fast</span>
+                           </div>
                        </div>
                    )}
                </div>
            </div>
 
-           {/* Danger Zone */}
+           {/* Data Cleanup */}
            <div>
                <h3 className="text-xs font-bold text-red-400 dark:text-red-500/80 mb-3 uppercase tracking-widest flex items-center gap-2">
                    <div className="w-1 h-1 rounded-full bg-red-500"></div>
-                   危险区域
+                   数据清理
                </h3>
                <div className="flex flex-col gap-2">
                    <button 

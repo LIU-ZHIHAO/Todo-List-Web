@@ -57,7 +57,7 @@ const AmbientStreamItem = ({ id, content, type, onDelete }: { id?: string, conte
 // Scrolling Item Component for Center Stream - Pure Display
 const ScrollingItem = ({ text }: { text: string }) => {
     return (
-        <div className="w-full flex justify-center px-4 group relative">
+        <div className="w-full flex justify-center px-4 pb-4 group relative">
             <div className="relative max-w-full flex items-center">
                 <span className={`
                     text-sm font-medium py-1.5 tracking-wide px-5 rounded-full border whitespace-nowrap overflow-hidden text-ellipsis shadow-sm transition-all duration-300
@@ -101,34 +101,6 @@ const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
 };
 
-// New Energy Core Button
-const TechButton = ({ onClick, icon: Icon, label, colorClass, ringClass, glowClass }: any) => (
-  <button 
-    onClick={onClick} 
-    className="group pointer-events-auto relative w-14 h-14 flex items-center justify-center transition-all duration-500 hover:scale-110 active:scale-95 flex-shrink-0"
-  >
-     {/* Text Label (Top) */}
-     <div className={`absolute -top-9 left-1/2 -translate-x-1/2 text-sm font-normal tracking-wide opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-y-2 group-hover:translate-y-0 whitespace-nowrap ${glowClass} text-slate-700 dark:text-white drop-shadow-md pointer-events-none bg-white/80 dark:bg-transparent px-2 py-0.5 rounded-full backdrop-blur-sm`}>
-        {label}
-     </div>
-     
-     {/* Connecting Line */}
-     <div className={`absolute -top-2 left-1/2 w-px h-2 ${colorClass} opacity-0 group-hover:opacity-40 transition-opacity duration-300`} />
-
-     {/* Outer Rotating Ring */}
-     <div className={`absolute inset-0 rounded-full border border-dashed ${ringClass} opacity-30 group-hover:opacity-60 animate-[spin_10s_linear_infinite]`} />
-     
-     {/* Inner Counter-Rotating Ring */}
-     <div className={`absolute inset-[-2px] rounded-full border-l-2 border-r-2 border-t-transparent border-b-transparent ${ringClass} opacity-40 group-hover:opacity-80 animate-[spin_3s_linear_infinite_reverse]`} />
-     
-     {/* Core Background */}
-     <div className={`absolute inset-2 rounded-full bg-gradient-to-br ${colorClass} opacity-90 group-hover:opacity-100 shadow-lg shadow-current group-hover:shadow-xl transition-all duration-500`}></div>
-     
-     {/* Icon */}
-     <Icon size={20} className="relative z-10 text-white drop-shadow-md group-hover:scale-110 transition-transform duration-300" />
-  </button>
-);
-
 export default function App() {
   // Theme State
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -160,7 +132,16 @@ export default function App() {
   // Stream Config State
   const [streamConfig, setStreamConfig] = useState<StreamConfig>(() => {
     const saved = localStorage.getItem('streamConfig');
-    return saved ? JSON.parse(saved) : { mode: 'scroll', speed: 'medium' };
+    try {
+        const parsed = saved ? JSON.parse(saved) : null;
+        // Migration check for old string values
+        if (parsed && typeof parsed.speed === 'string') {
+             return { mode: parsed.mode, speed: 50 }; // Default to 50 if migrating
+        }
+        return parsed || { mode: 'scroll', speed: 50 };
+    } catch (e) {
+        return { mode: 'scroll', speed: 50 };
+    }
   });
   
   // For static stream rotation
@@ -469,18 +450,21 @@ export default function App() {
         : DEMO_QUOTES.map((q, i) => ({ id: `demo-${i}`, content: q }));
     
     let items = [...contentSource];
-    while (items.length < 20) items = [...items, ...contentSource]; 
-    return items.slice(0, 60);
+    // Increase base item count to ensure smooth scroll on large screens
+    while (items.length < 15) items = [...items, ...contentSource]; 
+    return items.slice(0, 40); // Limit total items to avoid performance issues
   }, [quickNotes]);
 
-  // Determine animation duration based on config
-  const getAnimationDuration = () => {
-      switch (streamConfig.speed) {
-          case 'fast': return '40s';
-          case 'medium': return '80s';
-          case 'slow': return '120s';
-          default: return '80s';
-      }
+  // Determine animation duration based on content length and speed
+  const getAnimationDuration = (itemCount: number) => {
+      // Estimate item height + margin ~ 90px
+      const ESTIMATED_ITEM_HEIGHT = 96;
+      const totalHeight = itemCount * ESTIMATED_ITEM_HEIGHT;
+      // Speed is in pixels per second
+      const speed = typeof streamConfig.speed === 'number' ? streamConfig.speed : 50;
+      // Duration = Total Pixels / Speed
+      const duration = totalHeight / Math.max(20, speed); 
+      return `${duration}s`;
   };
 
   // Render Side Stream Content
@@ -491,8 +475,8 @@ export default function App() {
       if (streamConfig.mode === 'static') {
           if (items.length === 0) return null;
           
-          // Show 4 items, rotated by staticStreamIndex
-          const pageSize = 4;
+          // Fill vertical space - Show 10 items (approx full screen height)
+          const pageSize = 10;
           const startIndex = (staticStreamIndex * pageSize) % Math.max(1, items.length);
           const visibleItems = [];
           for (let i = 0; i < pageSize; i++) {
@@ -501,7 +485,7 @@ export default function App() {
           }
           
           return (
-              <div className="absolute w-full py-10 px-3 space-y-6">
+              <div className="absolute w-full py-4 px-3 space-y-6">
                   {visibleItems.map((item, i) => (
                       <div key={`${item.id}-${i}`} className="animate-in fade-in slide-in-from-bottom-4 duration-700">
                          <AmbientStreamItem 
@@ -515,14 +499,14 @@ export default function App() {
       }
 
       // SCROLL MODE
-      // Duplicate items for seamless loop
+      // Duplicate items for seamless loop. We need enough duplicates to ensure smooth infinite scroll.
       const scrollItems = [...items, ...items, ...items];
       const animationClass = isRight ? 'animate-float-down' : 'animate-float-up';
       
       return (
           <div 
-            className={`absolute w-full py-10 ${animationClass} hover-pause px-3 space-y-6 opacity-80 hover:opacity-100 transition-opacity duration-500`}
-            style={{ animationDuration: getAnimationDuration() }}
+            className={`absolute w-full py-4 ${animationClass} hover-pause px-3 space-y-6 opacity-80 hover:opacity-100 transition-opacity duration-500`}
+            style={{ animationDuration: getAnimationDuration(items.length * 3) }}
           >
              {scrollItems.map((item, i) => (
                 <AmbientStreamItem 
@@ -540,16 +524,21 @@ export default function App() {
     const qTasks = quadrants[q];
     const isOver = dragOverQuadrant === q;
 
+    // Determine float direction: Top quadrants float DOWN, bottom quadrants float UP
+    const isTop = q === Quadrant.Q1 || q === Quadrant.Q2;
+    const hoverClass = isTop ? 'hover:translate-y-2' : 'hover:-translate-y-2';
+
     return (
       <div 
         onClick={() => openAddModal(q)}
         onDragOver={(e) => e.preventDefault()}
         onDragEnter={(e) => handleDragEnter(e, q)}
         onDrop={(e) => handleDrop(e, q)}
-        className={`flex flex-col h-full rounded-2xl border backdrop-blur-sm p-4 transition-all duration-300 group relative overflow-hidden cursor-pointer
+        className={`flex flex-col h-full rounded-2xl border backdrop-blur-sm p-4 transition-all duration-500 ease-out group relative overflow-hidden cursor-pointer z-10
           ${isOver 
              ? `border-${info.color.split('-')[1]}-400 shadow-lg scale-[1.01] ${info.bgColor.replace('/80', '/90')} dark:bg-${info.color.split('-')[1]}-900/30` 
-             : `${info.bgColor} ${info.borderColor} hover:shadow-md hover:scale-[1.005]`
+             : `${info.bgColor} ${info.borderColor} 
+                hover:shadow-2xl hover:scale-[1.04] hover:z-30 ${hoverClass} hover:shadow-${info.color.split('-')[1]}-500/30`
           }
         `}
       >
@@ -557,13 +546,11 @@ export default function App() {
         {isOver && <div className={`absolute inset-0 bg-${info.color.split('-')[1]}-500/10 pointer-events-none z-0 animate-pulse`} />}
 
         <div className="flex items-center justify-between mb-2 relative z-10 flex-shrink-0 pointer-events-none">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight relative">
-               <span className={`absolute -inset-1 blur-md ${info.color} opacity-10 dark:opacity-20`}></span>
-               {/* Title Color: Uses specific quadrant color text for clean visibility */}
-               <span className={`relative ${info.color}`}>{info.label}</span>
+          <div className="flex items-baseline gap-2">
+            <h2 className={`text-2xl font-bold tracking-tight ${info.color} relative`}>
+               {info.label}
             </h2>
-            <p className="text-sm text-slate-500 dark:text-gray-400 mt-1 font-medium tracking-wide">{info.description}</p>
+            <span className="text-sm font-medium text-slate-500/80 dark:text-gray-400/80">({info.description})</span>
           </div>
           <span className={`px-2.5 py-1 rounded-lg text-xs font-bold bg-white/60 dark:bg-white/10 ${info.color} border border-white/30 dark:border-white/5 shadow-sm`}>
             {qTasks.length}
@@ -695,16 +682,15 @@ export default function App() {
                <div className="flex-1 flex items-end justify-between px-8 lg:px-16 gap-4 overflow-hidden pb-4">
                     
                     {/* Left Button */}
-                    <div className="mb-1">
-                        <TechButton 
-                            onClick={() => openAddModal()} 
-                            icon={Plus} 
-                            label="新建任务"
-                            colorClass="from-cyan-500 to-blue-600"
-                            ringClass="border-cyan-400"
-                            glowClass="text-cyan-700 dark:text-cyan-200"
-                        />
-                    </div>
+                    <button 
+                        onClick={() => openAddModal()} 
+                        className="flex flex-col items-center justify-center gap-2 group transition-transform hover:scale-105 active:scale-95"
+                    >
+                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg shadow-blue-500/30 flex items-center justify-center text-white group-hover:shadow-xl transition-all">
+                             <Plus size={24} />
+                         </div>
+                         <span className="text-xs font-bold text-slate-600 dark:text-gray-300">新建代办</span>
+                    </button>
                     
                     {/* Center Column: Input & Stream */}
                     <div className="flex flex-col items-center justify-center w-full max-w-xl mx-auto gap-3 z-20 self-center">
@@ -724,9 +710,9 @@ export default function App() {
                             />
                         </div>
 
-                        {/* Stream - Center always scrolls per spec, but we could reuse logic if needed. Keeping as is for "Core Stream" */}
+                        {/* Stream - Center always scrolls */}
                         <div className="w-full h-[12.5rem] relative overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)] flex items-center hover-pause">
-                             <div className="w-full animate-scroll-vertical flex flex-col items-center space-y-3" style={{ animationDuration: '80s' }}>
+                             <div className="w-full animate-scroll-vertical flex flex-col items-center" style={{ animationDuration: '80s' }}>
                                 {[...scrollingNotes, ...scrollingNotes].map((item, i) => (
                                     <ScrollingItem 
                                         key={i} 
@@ -738,16 +724,15 @@ export default function App() {
                     </div>
 
                     {/* Right Button */}
-                    <div className="mb-1">
-                        <TechButton 
-                            onClick={() => setIsHistoryOpen(true)} 
-                            icon={HistoryIcon} 
-                            label="历史记录"
-                            colorClass="from-violet-500 to-fuchsia-600"
-                            ringClass="border-violet-400"
-                            glowClass="text-violet-700 dark:text-violet-200"
-                        />
-                    </div>
+                    <button 
+                        onClick={() => setIsHistoryOpen(true)} 
+                        className="flex flex-col items-center justify-center gap-2 group transition-transform hover:scale-105 active:scale-95"
+                    >
+                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 shadow-lg shadow-violet-500/30 flex items-center justify-center text-white group-hover:shadow-xl transition-all">
+                             <HistoryIcon size={24} />
+                         </div>
+                         <span className="text-xs font-bold text-slate-600 dark:text-gray-300">历史回顾</span>
+                    </button>
                </div>
            </div>
 
@@ -761,7 +746,7 @@ export default function App() {
                          <span>数据加载中...</span>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-1 h-full">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 h-full">
                       {renderQuadrant(Quadrant.Q2)}
                       {renderQuadrant(Quadrant.Q1)}
                       {renderQuadrant(Quadrant.Q3)}
