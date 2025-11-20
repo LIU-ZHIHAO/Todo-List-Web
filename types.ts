@@ -42,6 +42,14 @@ export interface QuickNote {
   createdAt: number;
 }
 
+export type SortMode = 'custom' | 'created' | 'progress';
+export type SortDirection = 'asc' | 'desc';
+
+export interface SortConfig {
+  mode: SortMode;
+  direction: SortDirection;
+}
+
 export const TAG_COLORS: Record<Tag, string> = {
   [Tag.STUDY]: 'bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]',
   [Tag.LIFE]: 'bg-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.4)]',
