@@ -506,6 +506,15 @@ export default function App() {
     return items.slice(0, 15); 
   }, [quickNotes]);
 
+  const centerScrollDuration = useMemo(() => {
+    const speed = typeof streamConfig.speed === 'number' ? streamConfig.speed : 50;
+    // Target visual speed: allow user adjustment.
+    // We use a 0.5 factor to ensure the text remains readable even at default speeds.
+    const visualSpeed = speed * 0.5; 
+    const singleSetHeight = scrollingNotes.length * 48; // Approx 48px height per item
+    return `${singleSetHeight / Math.max(1, visualSpeed)}s`;
+  }, [scrollingNotes, streamConfig.speed]);
+
   const renderQuadrant = (q: Quadrant) => {
     const info = QUADRANT_INFO[q];
     const qTasks = quadrants[q];
@@ -692,7 +701,7 @@ export default function App() {
 
                         {/* Stream - Center always scrolls */}
                         <div className="w-full h-52 relative overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)] flex items-center hover-pause">
-                             <div className="w-full animate-scroll-vertical flex flex-col items-center will-change-transform" style={{ animationDuration: '80s' }}>
+                             <div className="w-full animate-scroll-vertical flex flex-col items-center will-change-transform" style={{ animationDuration: centerScrollDuration }}>
                                 {[...scrollingNotes, ...scrollingNotes].map((item, i) => (
                                     <ScrollingItem 
                                         key={i} 
