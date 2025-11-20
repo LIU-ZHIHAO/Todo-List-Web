@@ -33,6 +33,7 @@ export interface Task {
   progress: number; // 0 to 100
   createdAt: number;
   order: number; // For sorting
+  isOverdue?: boolean; // Auto-migrated flag
 }
 
 export interface QuickNote {

@@ -107,12 +107,22 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   // Colors
   const tagStyle = TAG_COLORS[task.tag] || 'bg-slate-400 text-white';
   
-  // Title Style
-  const titleStyle = task.completed
-    ? noStrikethrough 
-        ? 'text-emerald-600 font-medium dark:text-emerald-400/90' 
-        : 'line-through text-slate-400 dark:text-gray-500' 
-    : 'text-slate-800 font-semibold dark:text-gray-100';
+  // Title Style Logic
+  let titleStyle = 'font-semibold';
+  if (task.completed) {
+      if (noStrikethrough) {
+          titleStyle += ' text-emerald-600 dark:text-emerald-400/90 font-medium';
+      } else {
+          titleStyle += ' line-through text-slate-400 dark:text-gray-500';
+      }
+  } else {
+      // Visual Alert for Auto-moved Overdue Tasks
+      if (task.isOverdue) {
+          titleStyle += ' text-red-500 dark:text-red-400 animate-pulse font-bold';
+      } else {
+          titleStyle += ' text-slate-800 dark:text-gray-100';
+      }
+  }
 
   const renderProgressBar = () => (
     <div className={`${variant === 'history' ? 'w-full' : 'w-24 sm:w-32'} h-4 flex items-center gap-[2px] group/progress`} title={`当前进度: ${progress}%`}>
@@ -226,11 +236,15 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             </div>
 
              <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                <span className={`text-[9px] px-1.5 py-[1px] rounded font-bold tracking-wide ${tagStyle} shadow-sm opacity-90`}>
-                    {task.tag}
-                </span>
+                <div className="flex flex-col items-end">
+                    <span className={`text-[9px] px-1.5 py-[1px] rounded font-bold tracking-wide ${tagStyle} shadow-sm opacity-90`}>
+                        {task.tag}
+                    </span>
+                </div>
                 {variant === 'default' && (
-                    <span className="hidden sm:block text-[10px] text-slate-400 dark:text-gray-500 font-mono pt-[1px]">{task.date}</span>
+                    <span className={`hidden sm:block text-[10px] font-mono pt-[1px] ${task.isOverdue && !task.completed ? 'text-red-500 font-bold' : 'text-slate-400 dark:text-gray-500'}`}>
+                        {task.date}
+                    </span>
                 )}
             </div>
 
@@ -275,7 +289,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 {variant === 'default' && (
                     <div className="sm:hidden flex items-center gap-2 text-[10px] mb-2">
                         <span className={`px-1.5 py-0.5 rounded font-medium ${tagStyle}`}>{task.tag}</span>
-                        <span className="text-slate-400 dark:text-gray-400">{task.date}</span>
+                        <span className={`text-slate-400 dark:text-gray-400 ${task.isOverdue ? 'text-red-500 font-bold' : ''}`}>{task.date}</span>
                     </div>
                 )}
                 

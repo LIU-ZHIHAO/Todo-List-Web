@@ -10,7 +10,7 @@ import { AuthorModal } from './components/AuthorModal';
 import { SettingsModal } from './components/SettingsModal';
 import { HelpModal } from './components/HelpModal';
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 
 // Helper component for floating items with delete logic
 const AmbientStreamItem = ({ id, content, type, onDelete }: { id?: string, content: string; type: 'note' | 'task', onDelete?: (id: string) => void }) => {
@@ -173,16 +173,41 @@ export default function App() {
         dbService.getAllQuickNotes()
       ]);
       
-      const tasksWithOrder = tasksData.map(t => {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Process tasks: Migration and Order check
+      const processedTasks = tasksData.map(t => {
+          let modified = false;
+          const newTask = { ...t };
+
+          // 1. Order Migration
           if (typeof t.order !== 'number') {
-              const migrated = { ...t, order: t.createdAt };
-              dbService.updateTask(migrated); 
-              return migrated;
+              newTask.order = t.createdAt;
+              modified = true;
           }
-          return t;
+          
+          // 2. Deadline Auto-Move Logic
+          // Rule: If Q2 (Not Urgent) -> Deadline passed/today -> Move to Q1 (Urgent)
+          // Rule: If Q3 (Not Urgent) -> Deadline passed/today -> Move to Q4 (Urgent)
+          if (!t.completed && t.date <= today) {
+               if (t.quadrant === Quadrant.Q2) {
+                   newTask.quadrant = Quadrant.Q1;
+                   newTask.isOverdue = true;
+                   modified = true;
+               } else if (t.quadrant === Quadrant.Q3) {
+                   newTask.quadrant = Quadrant.Q4;
+                   newTask.isOverdue = true;
+                   modified = true;
+               }
+          }
+
+          if (modified) {
+              dbService.updateTask(newTask); // Update DB in background
+          }
+          return newTask;
       });
 
-      setTasks(tasksWithOrder);
+      setTasks(processedTasks);
       setQuickNotes(notesData.sort((a, b) => b.createdAt - a.createdAt));
     } catch (error) {
       console.error('Failed to fetch data', error);
@@ -721,7 +746,8 @@ export default function App() {
                         
                          {/* Input */}
                         <div className="w-full relative group">
-                            <div className="absolute inset-y-0 left-4 pl-1 flex items-center pointer-events-none">
+                            {/* Added z-10 to fix icon disappearance */}
+                            <div className="absolute inset-y-0 left-4 pl-1 flex items-center pointer-events-none z-10">
                                 <Zap size={18} className="text-yellow-500 dark:text-yellow-400 group-focus-within:text-yellow-600 dark:group-focus-within:text-yellow-300 transition-colors drop-shadow-sm dark:drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]" />
                             </div>
                             <input 
@@ -734,8 +760,8 @@ export default function App() {
                             />
                         </div>
 
-                        {/* Stream - Center always scrolls - Increased Height for 5 lines */}
-                        <div className="w-full h-[16rem] relative overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)] flex items-center hover-pause">
+                        {/* Stream - Center always scrolls - Reduced Height to h-24 (approx 96px) from h-[16rem] */}
+                        <div className="w-full h-24 relative overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)] flex items-center hover-pause">
                              <div className="w-full animate-scroll-vertical flex flex-col items-center" style={{ animationDuration: '80s' }}>
                                 {[...scrollingNotes, ...scrollingNotes].map((item, i) => (
                                     <ScrollingItem 
