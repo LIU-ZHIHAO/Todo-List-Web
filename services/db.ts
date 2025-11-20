@@ -2,7 +2,7 @@
 import { Task, QuickNote } from '../types';
 
 const DB_NAME = 'EisenhowerDB';
-const DB_VERSION = 5; // Bumped version to ensure quick_notes store is created
+const DB_VERSION = 6; // Bumped for potential schema updates if needed, though logic handles existing
 const STORE_TASKS = 'tasks';
 const STORE_NOTES = 'quick_notes';
 
@@ -31,7 +31,6 @@ export class DBService {
         }
 
         // Create quick_notes store if not exists
-        // IMPORTANT: This ensures the store exists for the Quick Notes feature
         if (!db.objectStoreNames.contains(STORE_NOTES)) {
           const store = db.createObjectStore(STORE_NOTES, { keyPath: 'id' });
           store.createIndex('createdAt', 'createdAt', { unique: false });
@@ -62,10 +61,43 @@ export class DBService {
     });
   }
 
+  /**
+   * Performance Optimization:
+   * Only fetch Active tasks (completed === null) 
+   * AND Completed tasks within the last 7 days.
+   */
+  async getInitialTasks(): Promise<Task[]> {
+    const db = await this.dbPromise;
+    const today = new Date();
+    // 7 days ago
+    const sevenDaysAgo = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_TASKS, 'readonly');
+      const store = transaction.objectStore(STORE_TASKS);
+      const request = store.openCursor();
+      const results: Task[] = [];
+
+      request.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest).result;
+        if (cursor) {
+          const task = cursor.value as Task;
+          // Keep if NOT completed OR completed recently
+          // Note: completed is string YYYY-MM-DD or null
+          if (!task.completed || task.completed >= sevenDaysAgo) {
+            results.push(task);
+          }
+          cursor.continue();
+        } else {
+          resolve(results);
+        }
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
   async getActiveTasks(): Promise<Task[]> {
-     // Performance optimization placeholder
-     // Currently calling getAllTasks is sufficient for <10000 items
-     return this.getAllTasks();
+     return this.getInitialTasks();
   }
 
   async addTask(task: Task): Promise<void> {
@@ -135,7 +167,6 @@ export class DBService {
   async getAllQuickNotes(): Promise<QuickNote[]> {
     const db = await this.dbPromise;
     return new Promise((resolve, reject) => {
-      // Check if store exists before transaction to prevent crash on old DB versions if upgrade failed
       if (!db.objectStoreNames.contains(STORE_NOTES)) {
         console.warn('Quick Notes store not found, returning empty.');
         resolve([]); 
@@ -154,8 +185,7 @@ export class DBService {
     const db = await this.dbPromise;
     return new Promise((resolve, reject) => {
       if (!db.objectStoreNames.contains(STORE_NOTES)) {
-         // Attempting to add to non-existent store
-         reject(new Error("Quick Notes store does not exist. Try refreshing the page to upgrade database."));
+         reject(new Error("Quick Notes store does not exist."));
          return;
       }
       const transaction = db.transaction(STORE_NOTES, 'readwrite');

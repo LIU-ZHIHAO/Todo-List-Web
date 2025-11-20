@@ -1,7 +1,7 @@
 
-import React, { useEffect, useState, useMemo } from 'react';
-import { Plus, History as HistoryIcon, CheckCircle2, Sparkles, Zap, LayoutGrid, Info, Trash2, Settings, Sun, Moon, HelpCircle } from 'lucide-react';
-import { Task, Quadrant, QuickNote, QUADRANT_INFO, SortConfig, StreamConfig, StreamMode, StreamSpeed } from './types';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { Plus, History as HistoryIcon, CheckCircle2, LayoutGrid, Info, Settings, Sun, Moon, HelpCircle } from 'lucide-react';
+import { Task, Quadrant, QuickNote, QUADRANT_INFO, SortConfig, StreamConfig } from './types';
 import { dbService } from './services/db';
 import { TaskCard } from './components/TaskCard';
 import { AddTaskModal } from './components/AddTaskModal';
@@ -9,53 +9,13 @@ import { HistoryModal } from './components/HistoryModal';
 import { AuthorModal } from './components/AuthorModal';
 import { SettingsModal } from './components/SettingsModal';
 import { HelpModal } from './components/HelpModal';
+import { InputArea } from './components/InputArea';
+import { SideStream } from './components/SideStream';
 
-const APP_VERSION = '1.1.1';
-
-// Helper component for floating items with delete logic
-const AmbientStreamItem = ({ id, content, type, onDelete }: { id?: string, content: string; type: 'note' | 'task', onDelete?: (id: string) => void }) => {
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!id || !onDelete) return;
-    setIsDeleting(true);
-    // Delay actual delete to show animation
-    setTimeout(() => {
-      onDelete(id);
-    }, 500);
-  };
-
-  return (
-    <div className={`
-      mb-6 p-4 rounded-lg backdrop-blur-sm border transition-all duration-300 group relative shadow-sm
-      ${isDeleting ? 'animate-shake bg-red-50 border-red-200 dark:bg-red-500/20 dark:border-red-500/50' : 'transform hover:scale-105'}
-      ${type === 'note' 
-        ? 'bg-purple-50/80 border-purple-200 text-purple-800 dark:bg-purple-500/5 dark:border-purple-500/20 dark:text-purple-200/70 dark:shadow-[0_0_15px_rgba(168,85,247,0.1)] hover:bg-purple-100 dark:hover:bg-purple-500/10' 
-        : 'bg-emerald-50/80 border-emerald-200 text-emerald-800 dark:bg-emerald-500/5 dark:border-emerald-500/20 dark:text-emerald-200/70 dark:shadow-[0_0_15px_rgba(16,185,129,0.1)] hover:bg-emerald-100 dark:hover:bg-emerald-500/10'
-      }
-    `}>
-      <div className="flex items-start gap-3">
-        {type === 'note' ? <Sparkles size={14} className="mt-1 opacity-60 shrink-0" /> : <CheckCircle2 size={14} className="mt-1 opacity-60 shrink-0" />}
-        <p className="text-xs font-medium leading-relaxed line-clamp-4 text-ellipsis overflow-hidden tracking-wide flex-1 transition-all duration-300 group-hover:pr-6">{content}</p>
-      </div>
-      
-      {/* Delete Button for Notes */}
-      {type === 'note' && onDelete && (
-        <button 
-          onClick={handleDelete}
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110 shadow-lg"
-          title="删除闪念"
-        >
-          <Trash2 size={14} />
-        </button>
-      )}
-    </div>
-  );
-};
+const APP_VERSION = '1.2.0';
 
 // Scrolling Item Component for Center Stream - Pure Display
-const ScrollingItem: React.FC<{ text: string }> = ({ text }) => {
+const ScrollingItem: React.FC<{ text: string }> = React.memo(({ text }) => {
     return (
         <div className="w-full flex justify-center px-4 pb-3 group relative">
             <div className="relative max-w-full flex items-center">
@@ -69,7 +29,7 @@ const ScrollingItem: React.FC<{ text: string }> = ({ text }) => {
             </div>
         </div>
     );
-}
+});
 
 const DEMO_QUOTES = [
     "生活不是等待暴风雨过去，而是学会在雨中跳舞。",
@@ -112,6 +72,8 @@ export default function App() {
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [quickNotes, setQuickNotes] = useState<QuickNote[]>([]);
+  const [hasLoadedFullHistory, setHasLoadedFullHistory] = useState(false);
+
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [initialQuadrant, setInitialQuadrant] = useState<Quadrant | null>(null);
@@ -121,7 +83,6 @@ export default function App() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
-  const [quickNoteInput, setQuickNoteInput] = useState('');
   
   // Sorting Config State
   const [sortConfig, setSortConfig] = useState<SortConfig>(() => {
@@ -134,9 +95,8 @@ export default function App() {
     const saved = localStorage.getItem('streamConfig');
     try {
         const parsed = saved ? JSON.parse(saved) : null;
-        // Migration check for old string values
         if (parsed && typeof parsed.speed === 'string') {
-             return { mode: parsed.mode, speed: 50 }; // Default to 50 if migrating
+             return { mode: parsed.mode, speed: 50 }; 
         }
         return parsed || { mode: 'scroll', speed: 50 };
     } catch (e) {
@@ -144,9 +104,6 @@ export default function App() {
     }
   });
   
-  // For static stream rotation
-  const [staticStreamIndex, setStaticStreamIndex] = useState(0);
-
   // Drag State
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverQuadrant, setDragOverQuadrant] = useState<Quadrant | null>(null);
@@ -172,10 +129,11 @@ export default function App() {
       return dateStr < today;
   };
 
-  const fetchAllData = async () => {
+  const fetchInitialData = async () => {
     try {
+      // Optimization: Only load active tasks and recent completed tasks
       const [tasksData, notesData] = await Promise.all([
-        dbService.getAllTasks(),
+        dbService.getInitialTasks(),
         dbService.getAllQuickNotes()
       ]);
       
@@ -184,20 +142,15 @@ export default function App() {
       // Process tasks: Migration and Order check
       const processedTasks = tasksData.map(t => {
           let modified = false;
-          // Use any to bypass strict type check during migration inspection
           const newTask = { ...t } as any;
 
-          // 1. Order Migration
           if (typeof t.order !== 'number') {
               newTask.order = t.createdAt;
               modified = true;
           }
           
-          // 2. Completed Field Migration (Boolean -> String|Null)
           if (typeof newTask.completed === 'boolean') {
               if (newTask.completed) {
-                   // If boolean true, migrate to date string
-                   // Prefer completedAt timestamp if available, else use current date as fallback
                    if (newTask.completedAt) {
                        newTask.completed = new Date(newTask.completedAt).toISOString().split('T')[0];
                    } else {
@@ -209,10 +162,6 @@ export default function App() {
               modified = true;
           }
 
-          // 3. Deadline Auto-Move Logic
-          // Rule: If Q2 (Not Urgent) -> Deadline passed -> Move to Q1 (Urgent)
-          // Rule: If Q3 (Not Urgent) -> Deadline passed -> Move to Q4 (Urgent)
-          // Condition: Date STRICTLY LESS THAN today AND not completed
           if (!newTask.completed && newTask.date < today) {
                if (newTask.quadrant === Quadrant.Q2) {
                    newTask.quadrant = Quadrant.Q1;
@@ -223,12 +172,10 @@ export default function App() {
                    newTask.isOverdue = true;
                    modified = true;
                } else if (!newTask.isOverdue) {
-                   // Mark as overdue if not already (e.g. already in Q1/Q4)
                    newTask.isOverdue = true;
                    modified = true;
                }
           } else {
-               // Reset isOverdue if date is today or future (or task completed)
                if (newTask.isOverdue) {
                    newTask.isOverdue = false;
                    modified = true;
@@ -236,7 +183,7 @@ export default function App() {
           }
 
           if (modified) {
-              dbService.updateTask(newTask); // Update DB in background
+              dbService.updateTask(newTask);
           }
           return newTask as Task;
       });
@@ -250,8 +197,28 @@ export default function App() {
     }
   };
 
+  // Load full history only when needed
+  const loadFullHistory = async () => {
+      if (hasLoadedFullHistory) return;
+      setSaveStatus('saving');
+      try {
+          const allTasks = await dbService.getAllTasks();
+          setTasks(allTasks);
+          setHasLoadedFullHistory(true);
+      } catch (e) {
+          console.error("Failed to load history", e);
+      } finally {
+          setTimeout(() => setSaveStatus('saved'), 500);
+      }
+  };
+
+  const handleOpenHistory = () => {
+      loadFullHistory();
+      setIsHistoryOpen(true);
+  };
+
   useEffect(() => {
-    fetchAllData();
+    fetchInitialData();
   }, []);
 
   // Persist Configs
@@ -262,16 +229,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('streamConfig', JSON.stringify(streamConfig));
   }, [streamConfig]);
-
-  // Static Stream Rotation Timer
-  useEffect(() => {
-      if (streamConfig.mode === 'static') {
-          const interval = setInterval(() => {
-              setStaticStreamIndex(prev => prev + 1);
-          }, 10000);
-          return () => clearInterval(interval);
-      }
-  }, [streamConfig.mode]);
 
   const withSaveStatus = async (operation: Promise<void>) => {
     setSaveStatus('saving');
@@ -312,15 +269,12 @@ export default function App() {
     const processedTask = { ...task };
     const today = new Date().toISOString().split('T')[0];
     
-    // Handle New Task Logic
     if (!editingTask) {
         if (processedTask.completed) {
-             // If somehow created as completed
              processedTask.completedAt = Date.now();
         }
     }
 
-    // Update isOverdue state based on new date
     if (!processedTask.completed && checkIsOverdue(processedTask.date)) {
         processedTask.isOverdue = true;
     } else {
@@ -339,22 +293,20 @@ export default function App() {
     setInitialQuadrant(null);
   };
 
-  const handleTaskDelete = async (id: string) => {
+  const handleTaskDelete = useCallback(async (id: string) => {
     await withSaveStatus(dbService.deleteTask(id));
     setTasks(prev => prev.filter(t => t.id !== id));
-  };
+  }, []);
 
-  const handleTaskUpdate = async (updatedTask: Task) => {
+  const handleTaskUpdate = useCallback(async (updatedTask: Task) => {
     const processedTask = { ...updatedTask };
 
-    // 1. Update isOverdue state (in case date changed or status changed)
     if (!processedTask.completed && checkIsOverdue(processedTask.date)) {
         processedTask.isOverdue = true;
     } else {
         processedTask.isOverdue = false;
     }
 
-    // 2. Update completedAt timestamp if just completed
     if (processedTask.completed) {
         if (!processedTask.completedAt) {
              processedTask.completedAt = Date.now();
@@ -365,7 +317,7 @@ export default function App() {
 
     await withSaveStatus(dbService.updateTask(processedTask));
     setTasks(prev => prev.map(t => t.id === processedTask.id ? processedTask : t));
-  };
+  }, []);
 
   const handleImportData = async (importedTasks: Task[], importedNotes: QuickNote[]) => {
     setSaveStatus('saving');
@@ -373,7 +325,6 @@ export default function App() {
       // Import Tasks
       if (importedTasks && importedTasks.length > 0) {
           for (const task of importedTasks) {
-             // Ensure imported tasks have correct completed format if coming from old backup
              if (typeof (task as any).completed === 'boolean') {
                  if ((task as any).completed) {
                      task.completed = task.completedAt 
@@ -398,7 +349,13 @@ export default function App() {
           }
       }
 
-      await fetchAllData();
+      // Reload with full data after import
+      const allTasks = await dbService.getAllTasks();
+      const allNotes = await dbService.getAllQuickNotes();
+      setTasks(allTasks);
+      setQuickNotes(allNotes.sort((a, b) => b.createdAt - a.createdAt));
+      setHasLoadedFullHistory(true);
+      
       setTimeout(() => setSaveStatus('saved'), 800);
     } catch (e) {
       console.error("Import failed", e);
@@ -406,11 +363,11 @@ export default function App() {
     }
   };
 
-  const openEditModal = (task: Task) => {
+  const openEditModal = useCallback((task: Task) => {
       setEditingTask(task);
       setInitialQuadrant(null);
       setIsTaskModalOpen(true);
-  };
+  }, []);
 
   const openAddModal = (quadrant?: Quadrant) => {
       setEditingTask(null);
@@ -419,25 +376,20 @@ export default function App() {
   };
 
   // Quick Notes
-  const handleQuickNoteSubmit = async (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (!quickNoteInput.trim()) return;
+  const handleAddQuickNote = useCallback(async (content: string) => {
       const newNote: QuickNote = {
         id: generateId(),
-        content: quickNoteInput.trim(),
+        content: content,
         createdAt: Date.now(),
       };
       await withSaveStatus(dbService.addQuickNote(newNote));
       setQuickNotes(prev => [newNote, ...prev]);
-      setQuickNoteInput('');
-    }
-  };
+  }, []);
 
-  const handleDeleteQuickNote = async (id: string) => {
+  const handleDeleteQuickNote = useCallback(async (id: string) => {
     await withSaveStatus(dbService.deleteQuickNote(id));
     setQuickNotes(prev => prev.filter(n => n.id !== id));
-  };
+  }, []);
 
   // --- Sort Logic ---
   const getSortedTasks = (list: Task[]) => {
@@ -449,19 +401,13 @@ export default function App() {
           }
 
           if (mode === 'created') {
-              // asc: earliest (smallest timestamp) first
-              // desc: latest (largest timestamp) first
               return direction === 'asc' ? a.createdAt - b.createdAt : b.createdAt - a.createdAt;
           }
 
           if (mode === 'progress') {
-              // Primary: Progress
-              // asc: lowest (0) first
-              // desc: highest (100) first
               if (a.progress !== b.progress) {
                   return direction === 'asc' ? a.progress - b.progress : b.progress - a.progress;
               }
-              // Secondary: Order
               return a.order - b.order;
           }
 
@@ -478,15 +424,15 @@ export default function App() {
   }, [tasks, sortConfig]);
 
   // --- Drag & Drop Logic ---
-  const handleDragStart = (e: React.DragEvent, id: string) => {
+  const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
       setDraggedTaskId(id);
       e.dataTransfer.effectAllowed = 'move';
-  };
+  }, []);
 
-  const handleDragEnter = (e: React.DragEvent, q: Quadrant) => {
+  const handleDragEnter = useCallback((e: React.DragEvent, q: Quadrant) => {
       e.preventDefault();
       setDragOverQuadrant(q);
-  };
+  }, []);
 
   const handleDrop = async (e: React.DragEvent, targetQuadrant: Quadrant, targetTaskId?: string, position?: 'top' | 'bottom') => {
       e.preventDefault();
@@ -543,11 +489,8 @@ export default function App() {
     const notes = quickNotes.map(n => ({ id: n.id, content: n.content, type: 'note' as const }));
     const combined = [...completed, ...notes].sort(() => Math.random() - 0.5);
     
-    // Ensure we have enough items for static display or scrolling
     if (combined.length === 0) return [];
-    
-    // For scrolling, we usually duplicate. For static, we just need the list.
-    return combined;
+    return combined.slice(0, 20);
   }, [tasks, quickNotes]);
   
   const leftStream = useMemo(() => streamItems.filter((_, i) => i % 2 === 0), [streamItems]);
@@ -559,85 +502,16 @@ export default function App() {
         : DEMO_QUOTES.map((q, i) => ({ id: `demo-${i}`, content: q }));
     
     let items = [...contentSource];
-    // Increase base item count to ensure smooth scroll on large screens
-    while (items.length < 15) items = [...items, ...contentSource]; 
-    return items.slice(0, 40); // Limit total items to avoid performance issues
+    while (items.length < 10) items = [...items, ...contentSource]; 
+    return items.slice(0, 15); 
   }, [quickNotes]);
-
-  // Determine animation duration based on content length and speed
-  const getAnimationDuration = (itemCount: number) => {
-      // Estimate item height + margin ~ 90px
-      const ESTIMATED_ITEM_HEIGHT = 96;
-      const totalHeight = itemCount * ESTIMATED_ITEM_HEIGHT;
-      // Speed is in pixels per second
-      const speed = typeof streamConfig.speed === 'number' ? streamConfig.speed : 50;
-      // Duration = Total Pixels / Speed
-      const duration = totalHeight / Math.max(20, speed); 
-      return `${duration}s`;
-  };
-
-  // Render Side Stream Content
-  const renderSideStream = (items: typeof leftStream, isRight: boolean) => {
-      if (streamConfig.mode === 'hidden') return null;
-
-      // STATIC MODE
-      if (streamConfig.mode === 'static') {
-          if (items.length === 0) return null;
-          
-          // Fill vertical space - Show 18 items to ensure it fills 1080p vertical screens
-          // Dynamic fill based on list looping
-          const pageSize = 18;
-          const startIndex = (staticStreamIndex * pageSize) % Math.max(1, items.length);
-          const visibleItems = [];
-          for (let i = 0; i < pageSize; i++) {
-              const item = items[(startIndex + i) % items.length];
-              if (item) visibleItems.push({ ...item, renderKey: `${item.id}-${i}` });
-          }
-          
-          return (
-              <div className="absolute w-full py-4 px-3 space-y-6 overflow-hidden">
-                  {visibleItems.map((item) => (
-                      <div key={item.renderKey} className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-                         <AmbientStreamItem 
-                            {...item} 
-                            onDelete={item.type === 'note' ? handleDeleteQuickNote : undefined} 
-                         />
-                      </div>
-                  ))}
-              </div>
-          );
-      }
-
-      // SCROLL MODE
-      // Duplicate items for seamless loop. We need enough duplicates to ensure smooth infinite scroll.
-      const scrollItems = [...items, ...items, ...items];
-      const animationClass = isRight ? 'animate-float-down' : 'animate-float-up';
-      
-      return (
-          <div 
-            className={`absolute w-full py-4 ${animationClass} hover-pause px-3 space-y-6 opacity-80 hover:opacity-100 transition-opacity duration-500`}
-            style={{ animationDuration: getAnimationDuration(items.length * 3) }}
-          >
-             {scrollItems.map((item, i) => (
-                <AmbientStreamItem 
-                    key={`${isRight ? 'r' : 'l'}-${i}`} 
-                    {...item} 
-                    onDelete={item.type === 'note' ? handleDeleteQuickNote : undefined} 
-                />
-             ))}
-          </div>
-      );
-  };
 
   const renderQuadrant = (q: Quadrant) => {
     const info = QUADRANT_INFO[q];
     const qTasks = quadrants[q];
     const isOver = dragOverQuadrant === q;
 
-    // Determine float direction & z-index logic
     const isTop = q === Quadrant.Q1 || q === Quadrant.Q2;
-    // Top quadrants float DOWN, bottom float UP to avoid edges
-    // When hovered, we increase z-index to 30 to ensure overlap covers the other quadrants
     const hoverClass = isTop ? 'hover:translate-y-2' : 'hover:-translate-y-2';
 
     return (
@@ -657,7 +531,7 @@ export default function App() {
         {/* Active Drop Glow */}
         {isOver && <div className={`absolute inset-0 bg-${info.color.split('-')[1]}-500/10 pointer-events-none z-0 animate-pulse`} />}
 
-        {/* Title Row - Description moved to right side */}
+        {/* Title Row */}
         <div className="flex items-baseline gap-2 mb-2 relative z-10 flex-shrink-0 pointer-events-none">
           <h2 className={`text-2xl font-bold tracking-tight ${info.color} relative`}>
              {info.label}
@@ -671,7 +545,7 @@ export default function App() {
           </span>
         </div>
         
-        <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar pr-1 relative z-10 pb-2">
+        <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 relative z-10 pb-2">
           {qTasks.length === 0 && !isOver ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-gray-500/40 border-2 border-dashed border-slate-300/50 dark:border-gray-500/10 rounded-xl p-4 select-none transition-colors">
               <Plus size={24} className="mb-2 opacity-50" />
@@ -701,7 +575,7 @@ export default function App() {
           )}
         </div>
         
-        {/* Gradient Overlay: Subtle in Light Mode */}
+        {/* Gradient Overlay */}
         <div className={`absolute inset-0 pointer-events-none bg-gradient-to-br from-white/0 to-white/0 dark:${info.gradient} opacity-100 transition-opacity duration-700`}></div>
       </div>
     );
@@ -712,15 +586,12 @@ export default function App() {
       
       {/* Background */}
       <div className="fixed inset-0 z-[-1] overflow-hidden pointer-events-none bg-slate-50 dark:bg-[#0f172a] transition-colors duration-500">
-        {/* Light Mode: Solid soft background / Dark Mode: Deep gradient */}
         <div className="absolute inset-0 bg-slate-50 dark:bg-gradient-to-br dark:from-slate-900 dark:via-[#131c35] dark:to-slate-900 opacity-100 dark:opacity-80"></div>
         
-        {/* Blobs - Very subtle in Light Mode (Pastels) */}
         <div className="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-blue-200/30 dark:bg-purple-600/30 rounded-full mix-blend-multiply dark:mix-blend-normal filter blur-[80px] dark:blur-[100px] opacity-40 dark:opacity-60 animate-blob transition-colors duration-500"></div>
         <div className="absolute top-1/4 right-[-10%] w-[35rem] h-[35rem] bg-indigo-200/30 dark:bg-indigo-600/30 rounded-full mix-blend-multiply dark:mix-blend-normal filter blur-[80px] dark:blur-[100px] opacity-30 dark:opacity-50 animate-blob animation-delay-2000 transition-colors duration-500"></div>
         <div className="absolute -bottom-32 left-20 w-[45rem] h-[45rem] bg-emerald-100/30 dark:bg-blue-600/20 rounded-full mix-blend-multiply dark:mix-blend-normal filter blur-[80px] dark:blur-[100px] opacity-40 dark:opacity-60 animate-blob animation-delay-4000 transition-colors duration-500"></div>
         
-        {/* Noise Texture */}
         <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.03] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48ZmlsdGVyIGlkPSJmIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC42NSIgbnVtT2N0YXZlcz0iMyIgc3RpdGNoVGlsZXM9InN0aXRjaCIvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNmKSIvPjwvc3ZnPg==')] pointer-events-none"></div>
       </div>
 
@@ -730,7 +601,7 @@ export default function App() {
         <aside className={`hidden xl:block w-[12.5%] h-full overflow-hidden relative border-r border-slate-200 dark:border-white/5 bg-white/40 dark:bg-slate-900/20 flex-shrink-0 transition-colors duration-500 ${streamConfig.mode === 'hidden' ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-slate-50 dark:from-[#0f172a] to-transparent z-10 pointer-events-none transition-colors"></div>
           <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-slate-50 dark:from-[#0f172a] to-transparent z-10 pointer-events-none transition-colors"></div>
-          {renderSideStream(leftStream, false)}
+          <SideStream items={leftStream} isRight={false} config={streamConfig} onDeleteNote={handleDeleteQuickNote} />
         </aside>
 
         {/* Main Content */}
@@ -753,7 +624,6 @@ export default function App() {
                   {/* Right Header Controls */}
                   <div className="absolute right-8 top-1/2 translate-y-1 flex items-center gap-3">
                     
-                    {/* Theme Switcher */}
                     <button 
                         onClick={toggleTheme} 
                         className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-slate-200/50 dark:text-gray-400 dark:hover:text-blue-300 dark:hover:bg-white/5 transition-colors" 
@@ -762,7 +632,6 @@ export default function App() {
                         {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
                     </button>
 
-                    {/* Help Button */}
                     <button 
                         onClick={() => setIsHelpOpen(true)} 
                         className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-slate-200/50 dark:text-gray-400 dark:hover:text-blue-300 dark:hover:bg-white/5 transition-colors" 
@@ -795,7 +664,7 @@ export default function App() {
                {/* 2. Bottom Control Row */}
                <div className="flex-1 flex items-end justify-between px-8 lg:px-16 gap-4 overflow-hidden pb-4">
                     
-                    {/* Left Button - New Task (Tooltip & Enhanced Animation) */}
+                    {/* Left Button - New Task */}
                     <button 
                         onClick={() => openAddModal()} 
                         className="flex flex-col items-center justify-center gap-2 group relative transition-transform hover:scale-110 active:scale-95"
@@ -807,42 +676,23 @@ export default function App() {
                          </div>
 
                          <div className="relative flex items-center justify-center">
-                            {/* Enhanced Spinners */}
                             <div className="absolute inset-[-4px] rounded-full border-2 border-transparent border-t-cyan-400/50 border-r-cyan-400/50 opacity-0 group-hover:opacity-100 animate-[spin_2s_linear_infinite]"></div>
                             <div className="absolute inset-[-2px] rounded-full border-2 border-transparent border-b-cyan-300/60 border-l-cyan-300/60 opacity-40 group-hover:opacity-100 animate-[spin_3s_linear_infinite_reverse]"></div>
-                            
-                            {/* Main Button Body */}
                             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 shadow-[0_0_15px_rgba(6,182,212,0.4)] flex items-center justify-center text-white group-hover:shadow-[0_0_30px_rgba(6,182,212,0.8)] transition-all duration-300 z-10">
                                 <Plus size={24} className="drop-shadow-md" />
                             </div>
-                            
-                            {/* Inner Glow */}
                             <div className="absolute inset-0 rounded-full bg-cyan-400/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                          </div>
                     </button>
                     
                     {/* Center Column: Input & Stream */}
                     <div className="flex flex-col items-center justify-center w-full max-w-xl mx-auto gap-3 z-20 self-center">
-                        
-                         {/* Input */}
-                        <div className="w-full relative group">
-                            {/* Added z-10 to fix icon disappearance */}
-                            <div className="absolute inset-y-0 left-4 pl-1 flex items-center pointer-events-none z-10">
-                                <Zap size={18} className="text-yellow-500 dark:text-yellow-400 group-focus-within:text-yellow-600 dark:group-focus-within:text-yellow-300 transition-colors drop-shadow-sm dark:drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]" />
-                            </div>
-                            <input 
-                                type="text" 
-                                value={quickNoteInput}
-                                onChange={(e) => setQuickNoteInput(e.target.value)}
-                                onKeyDown={handleQuickNoteSubmit}
-                                placeholder="捕捉闪念... (Enter)"
-                                className="w-full h-12 bg-white/80 border border-slate-200 dark:bg-white/5 dark:border-white/10 rounded-2xl py-3 pl-12 pr-4 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-gray-400 focus:outline-none focus:bg-white dark:focus:bg-white/10 focus:ring-1 focus:ring-blue-500/50 transition-all shadow-sm dark:shadow-lg backdrop-blur-md"
-                            />
-                        </div>
+                         {/* Optimized Input Component */}
+                        <InputArea onAddNote={handleAddQuickNote} />
 
-                        {/* Stream - Center always scrolls - Increased Height to h-52 (approx 208px) to fill space */}
+                        {/* Stream - Center always scrolls */}
                         <div className="w-full h-52 relative overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)] flex items-center hover-pause">
-                             <div className="w-full animate-scroll-vertical flex flex-col items-center" style={{ animationDuration: '80s' }}>
+                             <div className="w-full animate-scroll-vertical flex flex-col items-center will-change-transform" style={{ animationDuration: '80s' }}>
                                 {[...scrollingNotes, ...scrollingNotes].map((item, i) => (
                                     <ScrollingItem 
                                         key={i} 
@@ -853,9 +703,9 @@ export default function App() {
                         </div>
                     </div>
 
-                    {/* Right Button - History (Tooltip & Enhanced Animation) */}
+                    {/* Right Button - History */}
                     <button 
-                        onClick={() => setIsHistoryOpen(true)} 
+                        onClick={handleOpenHistory} 
                         className="flex flex-col items-center justify-center gap-2 group relative transition-transform hover:scale-110 active:scale-95"
                     >
                          {/* Tooltip */}
@@ -865,16 +715,11 @@ export default function App() {
                          </div>
 
                          <div className="relative flex items-center justify-center">
-                            {/* Enhanced Spinners */}
                             <div className="absolute inset-[-4px] rounded-full border-2 border-transparent border-t-violet-400/50 border-r-violet-400/50 opacity-0 group-hover:opacity-100 animate-[spin_2s_linear_infinite]"></div>
                             <div className="absolute inset-[-2px] rounded-full border-2 border-transparent border-b-violet-300/60 border-l-violet-300/60 opacity-40 group-hover:opacity-100 animate-[spin_3s_linear_infinite_reverse]"></div>
-                            
-                            {/* Main Button Body */}
                             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 shadow-[0_0_15px_rgba(139,92,246,0.4)] flex items-center justify-center text-white group-hover:shadow-[0_0_30px_rgba(139,92,246,0.8)] transition-all duration-300 z-10">
                                 <HistoryIcon size={24} className="drop-shadow-md" />
                             </div>
-                            
-                            {/* Inner Glow */}
                             <div className="absolute inset-0 rounded-full bg-violet-400/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                          </div>
                     </button>
@@ -883,7 +728,6 @@ export default function App() {
 
            {/* Bottom Section: Quadrants */}
            <div className="h-[66%] p-6 pt-0 overflow-hidden">
-               {/* Quadrant Container Background: Transparent/Subtle to let quadrant colors shine */}
                <div className="h-full rounded-3xl border border-slate-200 dark:border-white/5 bg-white/20 dark:bg-black/20 p-1 shadow-xl dark:shadow-2xl backdrop-blur-md transition-colors duration-500">
                   {loading ? (
                     <div className="flex items-center justify-center h-full text-gray-400 gap-2">
@@ -906,7 +750,7 @@ export default function App() {
         <aside className={`hidden xl:block w-[12.5%] h-full overflow-hidden relative border-l border-slate-200 dark:border-white/5 bg-white/40 dark:bg-slate-900/20 flex-shrink-0 transition-colors duration-500 ${streamConfig.mode === 'hidden' ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-slate-50 dark:from-[#0f172a] to-transparent z-10 pointer-events-none transition-colors"></div>
           <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-slate-50 dark:from-[#0f172a] to-transparent z-10 pointer-events-none transition-colors"></div>
-          {renderSideStream(rightStream, true)}
+          <SideStream items={rightStream} isRight={true} config={streamConfig} onDeleteNote={handleDeleteQuickNote} />
         </aside>
 
       </div>
