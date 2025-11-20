@@ -29,7 +29,7 @@ export interface Task {
   date: string; // ISO YYYY-MM-DD
   quadrant: Quadrant;
   tag: Tag;
-  completed: boolean;
+  completed: string | null; // ISO YYYY-MM-DD or null
   completedAt?: number; // Timestamp when completed
   progress: number; // 0 to 100
   createdAt: number;

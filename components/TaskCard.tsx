@@ -59,17 +59,19 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
   const toggleComplete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const newStatus = !task.completed;
+    const isCurrentlyCompleted = !!task.completed;
+    const newStatus = !isCurrentlyCompleted;
     const newProgress = newStatus ? 100 : 0;
     
     setProgress(newProgress);
     if (newStatus && !noStrikethrough) {
+        const today = new Date().toISOString().split('T')[0];
         setIsExiting(true);
         setTimeout(() => {
-            onUpdate({ ...task, completed: true, progress: 100 });
+            onUpdate({ ...task, completed: today, progress: 100 });
         }, 400);
     } else {
-        onUpdate({ ...task, completed: newStatus, progress: newProgress });
+        onUpdate({ ...task, completed: newStatus ? new Date().toISOString().split('T')[0] : null, progress: newProgress });
     }
   };
 
@@ -77,14 +79,22 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     const newProgress = level * 20;
     setProgress(newProgress);
     const isComplete = newProgress === 100;
+    const isCurrentlyCompleted = !!task.completed;
     
-    if (isComplete && !task.completed && !noStrikethrough) {
+    if (isComplete && !isCurrentlyCompleted && !noStrikethrough) {
+       const today = new Date().toISOString().split('T')[0];
        setIsExiting(true);
        setTimeout(() => {
-          onUpdate({ ...task, completed: true, progress: newProgress });
+          onUpdate({ ...task, completed: today, progress: newProgress });
        }, 400);
+    } else if (isComplete && !isCurrentlyCompleted) {
+       const today = new Date().toISOString().split('T')[0];
+       onUpdate({ ...task, completed: today, progress: newProgress });
+    } else if (!isComplete && isCurrentlyCompleted) {
+       // Un-complete
+       onUpdate({ ...task, completed: null, progress: newProgress });
     } else {
-       onUpdate({ ...task, completed: isComplete, progress: newProgress });
+       onUpdate({ ...task, progress: newProgress });
     }
   };
 

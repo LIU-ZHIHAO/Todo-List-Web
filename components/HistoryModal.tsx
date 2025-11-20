@@ -155,7 +155,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tas
     filtered = filtered.filter(t => isDateInRunge(t.date, dateFilter, filterDate));
     
     if (statusFilter === 'todo') filtered = filtered.filter(t => !t.completed);
-    if (statusFilter === 'done') filtered = filtered.filter(t => t.completed);
+    if (statusFilter === 'done') filtered = filtered.filter(t => !!t.completed); // Check for truthy string
     
     // Apply System Sort Logic instead of default date sort
     return applySystemSort(filtered);
@@ -166,7 +166,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tas
     return {
         all: rangeTasks.length,
         todo: rangeTasks.filter(t => !t.completed).length,
-        done: rangeTasks.filter(t => t.completed).length,
+        done: rangeTasks.filter(t => !!t.completed).length,
     };
   }, [tasks, dateFilter, filterDate]);
 
@@ -241,7 +241,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tas
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const dayTasks = tasks.filter(t => t.date === dateStr);
-      const completedTasks = dayTasks.filter(t => t.completed);
+      const completedTasks = dayTasks.filter(t => !!t.completed);
       const incompleteTasks = dayTasks.filter(t => !t.completed);
       const isSelected = selectedDate === dateStr;
       const isToday = new Date().toISOString().split('T')[0] === dateStr;

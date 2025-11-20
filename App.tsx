@@ -166,6 +166,12 @@ export default function App() {
       setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
+  // Helper for overdue check
+  const checkIsOverdue = (dateStr: string) => {
+      const today = new Date().toISOString().split('T')[0];
+      return dateStr < today;
+  };
+
   const fetchAllData = async () => {
     try {
       const [tasksData, notesData] = await Promise.all([
@@ -178,7 +184,8 @@ export default function App() {
       // Process tasks: Migration and Order check
       const processedTasks = tasksData.map(t => {
           let modified = false;
-          const newTask = { ...t };
+          // Use any to bypass strict type check during migration inspection
+          const newTask = { ...t } as any;
 
           // 1. Order Migration
           if (typeof t.order !== 'number') {
@@ -186,27 +193,43 @@ export default function App() {
               modified = true;
           }
           
-          // 2. Deadline Auto-Move Logic
+          // 2. Completed Field Migration (Boolean -> String|Null)
+          if (typeof newTask.completed === 'boolean') {
+              if (newTask.completed) {
+                   // If boolean true, migrate to date string
+                   // Prefer completedAt timestamp if available, else use current date as fallback
+                   if (newTask.completedAt) {
+                       newTask.completed = new Date(newTask.completedAt).toISOString().split('T')[0];
+                   } else {
+                       newTask.completed = new Date().toISOString().split('T')[0];
+                   }
+              } else {
+                   newTask.completed = null;
+              }
+              modified = true;
+          }
+
+          // 3. Deadline Auto-Move Logic
           // Rule: If Q2 (Not Urgent) -> Deadline passed -> Move to Q1 (Urgent)
           // Rule: If Q3 (Not Urgent) -> Deadline passed -> Move to Q4 (Urgent)
-          // Condition: Date STRICTLY LESS THAN today
-          if (!t.completed && t.date < today) {
-               if (t.quadrant === Quadrant.Q2) {
+          // Condition: Date STRICTLY LESS THAN today AND not completed
+          if (!newTask.completed && newTask.date < today) {
+               if (newTask.quadrant === Quadrant.Q2) {
                    newTask.quadrant = Quadrant.Q1;
                    newTask.isOverdue = true;
                    modified = true;
-               } else if (t.quadrant === Quadrant.Q3) {
+               } else if (newTask.quadrant === Quadrant.Q3) {
                    newTask.quadrant = Quadrant.Q4;
                    newTask.isOverdue = true;
                    modified = true;
-               } else if (!t.isOverdue) {
+               } else if (!newTask.isOverdue) {
                    // Mark as overdue if not already (e.g. already in Q1/Q4)
                    newTask.isOverdue = true;
                    modified = true;
                }
           } else {
                // Reset isOverdue if date is today or future (or task completed)
-               if (t.isOverdue) {
+               if (newTask.isOverdue) {
                    newTask.isOverdue = false;
                    modified = true;
                }
@@ -215,7 +238,7 @@ export default function App() {
           if (modified) {
               dbService.updateTask(newTask); // Update DB in background
           }
-          return newTask;
+          return newTask as Task;
       });
 
       setTasks(processedTasks);
@@ -284,37 +307,24 @@ export default function App() {
       }
   };
 
-  // Helper for overdue check
-  const checkIsOverdue = (dateStr: string) => {
-      const today = new Date().toISOString().split('T')[0];
-      return dateStr < today;
-  };
-
   // Task CRUD
   const handleSaveTask = async (task: Task) => {
     const processedTask = { ...task };
+    const today = new Date().toISOString().split('T')[0];
     
-    // 1. Update isOverdue state based on new date
+    // Handle New Task Logic
+    if (!editingTask) {
+        if (processedTask.completed) {
+             // If somehow created as completed
+             processedTask.completedAt = Date.now();
+        }
+    }
+
+    // Update isOverdue state based on new date
     if (!processedTask.completed && checkIsOverdue(processedTask.date)) {
         processedTask.isOverdue = true;
     } else {
         processedTask.isOverdue = false;
-    }
-
-    // 2. Update completedAt
-    if (processedTask.completed && !processedTask.completedAt) {
-        // If editing existing completed task, prefer keeping original time if available
-        // But Modal input represents new state.
-        // If editingTask was completed, assume we keep its time unless it was uncompleted.
-        // If this is a new completion action (via edit modal toggle? Modal doesn't have toggle),
-        // Modal usually saves properties. completed status is inherited from initialTask.
-        if (editingTask && editingTask.completed) {
-            processedTask.completedAt = editingTask.completedAt;
-        } else {
-            processedTask.completedAt = Date.now();
-        }
-    } else if (!processedTask.completed) {
-        processedTask.completedAt = undefined;
     }
 
     if (editingTask) {
@@ -344,11 +354,12 @@ export default function App() {
         processedTask.isOverdue = false;
     }
 
-    // 2. Update completedAt
-    // Logic: If marked completed and has no time, set it. If marked incomplete, clear it.
-    if (processedTask.completed && !processedTask.completedAt) {
-        processedTask.completedAt = Date.now();
-    } else if (!processedTask.completed) {
+    // 2. Update completedAt timestamp if just completed
+    if (processedTask.completed) {
+        if (!processedTask.completedAt) {
+             processedTask.completedAt = Date.now();
+        }
+    } else {
         processedTask.completedAt = undefined;
     }
 
@@ -362,6 +373,16 @@ export default function App() {
       // Import Tasks
       if (importedTasks && importedTasks.length > 0) {
           for (const task of importedTasks) {
+             // Ensure imported tasks have correct completed format if coming from old backup
+             if (typeof (task as any).completed === 'boolean') {
+                 if ((task as any).completed) {
+                     task.completed = task.completedAt 
+                        ? new Date(task.completedAt).toISOString().split('T')[0]
+                        : new Date().toISOString().split('T')[0];
+                 } else {
+                     task.completed = null;
+                 }
+             }
             await dbService.updateTask(task);
           }
       }
@@ -510,16 +531,6 @@ export default function App() {
           quadrant: targetQuadrant,
           order: newOrder
       };
-      
-      // Recalculate overdue/completion logic during drop just in case (though usually date doesn't change on drop)
-      // But dragging might happen across sessions or contexts.
-      // It's safer to call handleTaskUpdate logic, but handleTaskUpdate expects void return and updates state.
-      // Here we manually update state and DB.
-      // Let's reuse handleTaskUpdate for consistency?
-      // handleTaskUpdate updates DB and State.
-      // But handleDrop needs specific order logic already calculated.
-      // We will just call updateTask directly for the order/quadrant change. 
-      // completedAt/isOverdue shouldn't change just by moving quadrant (unless we add logic for that, which we won't for now).
       
       await withSaveStatus(dbService.updateTask(updatedTask));
       setTasks(prev => prev.map(t => t.id === draggedTaskId ? updatedTask : t));

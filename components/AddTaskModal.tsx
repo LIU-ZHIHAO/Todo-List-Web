@@ -121,7 +121,7 @@ export const AddTaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave
       date,
       quadrant,
       tag,
-      completed: initialTask ? initialTask.completed : false,
+      completed: initialTask ? initialTask.completed : null,
       progress: initialTask ? initialTask.progress : 0,
       createdAt: initialTask ? initialTask.createdAt : Date.now(),
       order: initialTask ? initialTask.order : Date.now(),
@@ -367,4 +367,3 @@ const CheckCircleIcon = ({ className }: { className: string }) => (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
     </svg>
 );
-    
