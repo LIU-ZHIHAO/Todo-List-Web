@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Trash2, CheckCircle2, Circle, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { Task, TAG_COLORS, Subtask } from '../types';
@@ -11,13 +12,14 @@ interface TaskCardProps {
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent, id: string) => void;
   onDrop?: (e: React.DragEvent, targetId: string, position: 'top' | 'bottom') => void;
+  variant?: 'default' | 'history'; // 'history' puts progress bar on a new line
 }
 
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
 
 export const TaskCard: React.FC<TaskCardProps> = ({ 
   task, onUpdate, onDelete, onEdit, noStrikethrough = false,
-  draggable, onDragStart, onDrop 
+  draggable, onDragStart, onDrop, variant = 'default'
 }) => {
   const [isExiting, setIsExiting] = useState(false);
   const [progress, setProgress] = useState(task.progress || 0);
@@ -108,6 +110,31 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     ? noStrikethrough ? 'text-emerald-400/90' : 'line-through text-gray-500' 
     : 'text-gray-100';
 
+  const renderProgressBar = () => (
+    <div className={`${variant === 'history' ? 'w-full' : 'w-24 sm:w-32'} h-4 flex items-center gap-[2px] group/progress`} title={`当前进度: ${progress}%`}>
+        {[20, 40, 60, 80, 100].map((level) => {
+            const isActive = progress >= level;
+            const isFull = level === 100;
+            
+            let colorClass = 'bg-gray-700/30 border border-white/5';
+            if (isActive) {
+                if (isFull) colorClass = 'bg-emerald-500 shadow-[0_0_5px_rgba(16,182,129,0.6)] border-emerald-400/50';
+                else if (level >= 80) colorClass = 'bg-blue-400 border-blue-300/50';
+                else if (level >= 40) colorClass = 'bg-blue-500/80 border-blue-400/40';
+                else colorClass = 'bg-blue-600/60 border-blue-500/30';
+            }
+
+            return (
+                <button
+                    key={level}
+                    onClick={(e) => { e.stopPropagation(); handleProgressClick(level / 20); }}
+                    className={`flex-1 h-2 rounded-[1px] transition-all duration-200 ${colorClass} hover:h-3 hover:brightness-125 transform origin-center`}
+                />
+            );
+        })}
+    </div>
+  );
+
   return (
     <div 
       draggable={draggable}
@@ -144,98 +171,103 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           <div className="absolute -bottom-[2px] left-0 right-0 h-[2px] bg-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.8)] rounded-full z-50 animate-pulse" />
       )}
 
-      {/* MAIN ROW: Flat Layout */}
-      <div className="flex items-center p-2.5 gap-3 h-12">
+      {/* CONTENT LAYOUT */}
+      <div className={`flex ${variant === 'history' ? 'flex-col gap-2 p-3 h-auto' : 'items-center p-2.5 gap-3 h-12'}`}>
         
-        {/* 1. Drag Handle (Hover) & Checkbox */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-            <button 
-                onClick={toggleComplete}
-                className={`transition-all duration-300 ${task.completed ? 'text-emerald-400' : 'text-gray-500 group-hover:text-gray-300'}`}
-            >
-                {task.completed ? <CheckCircle2 size={18} className="drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" /> : <Circle size={18} />}
-            </button>
-        </div>
-
-        {/* 2. Center Area: Title + Description + Metadata */}
-        <div className="flex-1 min-w-0 flex items-center gap-3 mr-2">
-            {/* Title: Limited width to allow description space, truncates if too long */}
-            <h3 
-                onClick={() => onEdit && onEdit(task)} 
-                className={`text-sm font-medium truncate cursor-pointer select-none flex-shrink-0 max-w-[30%] sm:max-w-[150px] md:max-w-[200px] ${titleStyle}`}
-                title={task.title}
-            >
-                {task.title}
-            </h3>
+        {/* Row 1: Checkbox + Title + Tag (If history mode, this is the top row) */}
+        <div className={`flex items-center ${variant === 'history' ? 'w-full justify-between' : 'flex-1 min-w-0 gap-3'}`}>
             
-            {/* Description / Note Area (Editable Inline) */}
-            <div className="flex-1 min-w-0 relative group/desc">
-                 {isEditingDesc ? (
-                    <input 
-                        autoFocus
-                        value={descInput}
-                        onChange={(e) => setDescInput(e.target.value)}
-                        onBlur={handleSaveDesc}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSaveDesc()}
-                        className="w-full bg-transparent border-b border-blue-500/50 text-xs text-gray-200 focus:outline-none pb-0.5"
-                        placeholder="输入备注..."
-                        onClick={(e) => e.stopPropagation()}
-                    />
-                 ) : (
-                    <div 
-                        onClick={(e) => { e.stopPropagation(); setIsEditingDesc(true); }}
-                        className={`text-xs truncate cursor-text py-1 ${task.description ? 'text-gray-400' : 'text-gray-600/70 hover:text-gray-500'}`}
-                        title={task.description || "点击添加备注"}
-                    >
-                        {task.description || "添加备注..."}
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+                {/* Checkbox */}
+                <button 
+                    onClick={toggleComplete}
+                    className={`transition-all duration-300 flex-shrink-0 ${task.completed ? 'text-emerald-400' : 'text-gray-500 group-hover:text-gray-300'}`}
+                >
+                    {task.completed ? <CheckCircle2 size={18} className="drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" /> : <Circle size={18} />}
+                </button>
+
+                {/* Title */}
+                <h3 
+                    onClick={() => onEdit && onEdit(task)} 
+                    className={`text-sm font-medium truncate cursor-pointer select-none flex-shrink-0 
+                        ${variant === 'history' ? 'max-w-[70%]' : 'max-w-[30%] sm:max-w-[150px] md:max-w-[200px]'} 
+                        ${titleStyle}`}
+                    title={task.title}
+                >
+                    {task.title}
+                </h3>
+
+                {/* Inline Description (Only in Default Mode) */}
+                {variant === 'default' && (
+                    <div className="flex-1 min-w-0 relative group/desc">
+                        {isEditingDesc ? (
+                            <input 
+                                autoFocus
+                                value={descInput}
+                                onChange={(e) => setDescInput(e.target.value)}
+                                onBlur={handleSaveDesc}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSaveDesc()}
+                                className="w-full bg-transparent border-b border-blue-500/50 text-xs text-gray-200 focus:outline-none pb-0.5"
+                                placeholder="输入备注..."
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        ) : (
+                            <div 
+                                onClick={(e) => { e.stopPropagation(); setIsEditingDesc(true); }}
+                                className={`text-xs truncate cursor-text py-1 ${task.description ? 'text-gray-400' : 'text-gray-600/70 hover:text-gray-500'}`}
+                                title={task.description || "点击添加备注"}
+                            >
+                                {task.description || "添加备注..."}
+                            </div>
+                        )}
                     </div>
-                 )}
+                )}
             </div>
 
-            {/* Tag & Date */}
-            <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+             {/* Tag & Date (Visible in Row 1 for both modes, but styled differently) */}
+             <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                 <span className={`text-[9px] px-1.5 py-[1px] rounded border font-medium ${tagStyle} opacity-80`}>
                     {task.tag}
                 </span>
-                <span className="text-[10px] text-gray-500 font-mono pt-[1px]">{task.date}</span>
-            </div>
-        </div>
-
-        {/* 3. Right Side Actions: Progress & Chevron */}
-        <div className="flex items-center gap-3 flex-shrink-0">
-            
-            {/* Progress Bar */}
-            <div className="w-24 sm:w-32 h-4 flex items-center gap-[2px] group/progress" title={`当前进度: ${progress}%`}>
-                {[20, 40, 60, 80, 100].map((level) => {
-                    const isActive = progress >= level;
-                    const isFull = level === 100;
-                    
-                    let colorClass = 'bg-gray-700/30 border border-white/5';
-                    if (isActive) {
-                        if (isFull) colorClass = 'bg-emerald-500 shadow-[0_0_5px_rgba(16,182,129,0.6)] border-emerald-400/50';
-                        else if (level >= 80) colorClass = 'bg-blue-400 border-blue-300/50';
-                        else if (level >= 40) colorClass = 'bg-blue-500/80 border-blue-400/40';
-                        else colorClass = 'bg-blue-600/60 border-blue-500/30';
-                    }
-
-                    return (
-                        <button
-                            key={level}
-                            onClick={(e) => { e.stopPropagation(); handleProgressClick(level / 20); }}
-                            className={`flex-1 h-2 rounded-[1px] transition-all duration-200 ${colorClass} hover:h-3 hover:brightness-125 transform origin-center`}
-                        />
-                    );
-                })}
+                {variant === 'default' && (
+                    <span className="hidden sm:block text-[10px] text-gray-500 font-mono pt-[1px]">{task.date}</span>
+                )}
             </div>
 
-            {/* Expand Button */}
-            <button 
-                onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-                className={`p-1 text-gray-500 hover:text-white transition-all rounded hover:bg-white/10 ${isExpanded ? 'bg-white/10 text-blue-400' : ''}`}
-            >
-                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            </button>
+            {/* Right Controls (Only in Default Mode) */}
+            {variant === 'default' && (
+                <div className="flex items-center gap-3 flex-shrink-0">
+                    {renderProgressBar()}
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
+                        className={`p-1 text-gray-500 hover:text-white transition-all rounded hover:bg-white/10 ${isExpanded ? 'bg-white/10 text-blue-400' : ''}`}
+                    >
+                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
+                </div>
+            )}
         </div>
+
+        {/* Row 2 (History Mode Only): Description + Progress */}
+        {variant === 'history' && (
+            <div className="w-full flex flex-col gap-2">
+                {task.description && (
+                     <p className="text-xs text-gray-500 px-1 line-clamp-2">{task.description}</p>
+                )}
+                <div className="flex items-center justify-between gap-3 mt-1">
+                    <div className="flex-1">
+                         {renderProgressBar()}
+                    </div>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
+                        className={`p-1 text-gray-500 hover:text-white transition-all rounded hover:bg-white/10 ${isExpanded ? 'bg-white/10 text-blue-400' : ''}`}
+                    >
+                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
+                </div>
+            </div>
+        )}
+
       </div>
 
       {/* EXPANDED AREA (Subtasks) */}
@@ -243,11 +275,20 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         <div className="px-3 pb-3 pt-0 animate-in slide-in-from-top-1 duration-200">
             <div className="pl-8 pr-1 space-y-3 pt-2 border-t border-white/5 mt-1">
                 
-                {/* Mobile Tag/Date Backup */}
-                <div className="sm:hidden flex items-center gap-2 text-[10px] mb-2">
-                    <span className={`px-1.5 py-0.5 rounded border font-medium ${tagStyle}`}>{task.tag}</span>
-                    <span className="text-gray-400">{task.date}</span>
-                </div>
+                {/* Mobile Tag/Date Backup (Default Mode only) */}
+                {variant === 'default' && (
+                    <div className="sm:hidden flex items-center gap-2 text-[10px] mb-2">
+                        <span className={`px-1.5 py-0.5 rounded border font-medium ${tagStyle}`}>{task.tag}</span>
+                        <span className="text-gray-400">{task.date}</span>
+                    </div>
+                )}
+                
+                {/* History Mode Date */}
+                {variant === 'history' && (
+                     <div className="flex items-center gap-2 text-[10px] mb-1 text-gray-400">
+                         <span>日期: {task.date}</span>
+                     </div>
+                )}
 
                 {/* Subtasks List */}
                 {(task.subtasks && task.subtasks.length > 0) || newSubtaskTitle ? (
@@ -281,7 +322,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                     </div>
                 ) : null}
 
-                {/* Add Subtask Input (Inline in Dropdown) */}
+                {/* Add Subtask Input */}
                 <div className="flex items-center gap-2 ml-1">
                     <div className="text-gray-500">
                         <Plus size={14} />

@@ -501,14 +501,7 @@ export default function App() {
 
       </div>
 
-      <AddTaskModal 
-        isOpen={isTaskModalOpen} 
-        onClose={() => setIsTaskModalOpen(false)} 
-        onSave={handleSaveTask}
-        initialTask={editingTask}
-        initialQuadrant={initialQuadrant}
-      />
-      
+      {/* Modals: Order matters for stacking context, but zIndex prop overrides */}
       <HistoryModal
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
@@ -516,11 +509,22 @@ export default function App() {
         onDelete={handleTaskDelete}
         onUpdate={handleTaskUpdate}
         onImport={handleImportTasks}
+        onEditTask={openEditModal}
       />
 
       <AuthorModal
         isOpen={isAuthorModalOpen}
         onClose={() => setIsAuthorModalOpen(false)}
+      />
+      
+      {/* AddTaskModal should be on top, hence zIndex="z-[60]" and placed last */}
+      <AddTaskModal 
+        isOpen={isTaskModalOpen} 
+        onClose={() => setIsTaskModalOpen(false)} 
+        onSave={handleSaveTask}
+        initialTask={editingTask}
+        initialQuadrant={initialQuadrant}
+        zIndex="z-[60]"
       />
 
     </div>

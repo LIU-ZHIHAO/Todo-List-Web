@@ -1,8 +1,10 @@
+
 import React, { useState, useMemo, useRef } from 'react';
 import { Modal } from './ui/Modal';
 import { Task, QUADRANT_INFO } from '../types';
 import { TaskCard } from './TaskCard';
-import { List, Calendar as CalendarIcon, CheckCircle2, Circle, BarChart3, Download, Upload, Database } from 'lucide-react';
+import { List, Calendar as CalendarIcon, CheckCircle2, Circle, BarChart3, Download, Upload, Database, CalendarRange, CalendarDays, Clock } from 'lucide-react';
+import { getLunarDate } from '../utils/lunar';
 
 interface HistoryModalProps {
   isOpen: boolean;
@@ -11,38 +13,90 @@ interface HistoryModalProps {
   onDelete: (id: string) => void;
   onUpdate: (task: Task) => void;
   onImport?: (tasks: Task[]) => void;
+  onEditTask?: (task: Task) => void;
 }
 
 type ViewMode = 'list' | 'calendar';
-type Filter = 'all' | 'todo' | 'done';
+type StatusFilter = 'all' | 'todo' | 'done';
+type DateRangeFilter = 'day' | 'week' | 'month' | 'year' | 'all_time';
 
 const FILTER_LABELS = {
-  all: '全部',
+  all: '全部状态',
   todo: '待办',
   done: '已完成'
 };
 
-export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tasks, onDelete, onUpdate, onImport }) => {
+const DATE_FILTER_LABELS = {
+  day: '今天',
+  week: '本周',
+  month: '本月',
+  year: '本年',
+  all_time: '全部时间'
+};
+
+export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tasks, onDelete, onUpdate, onImport, onEditTask }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [filter, setFilter] = useState<Filter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [dateFilter, setDateFilter] = useState<DateRangeFilter>('week'); // Default to Week
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Stats
-  const stats = useMemo(() => ({
-    all: tasks.length,
-    todo: tasks.filter(t => !t.completed).length,
-    done: tasks.filter(t => t.completed).length,
-  }), [tasks]);
+  // Date Helper Logic
+  const isDateInRunge = (dateStr: string, range: DateRangeFilter): boolean => {
+      const d = new Date(dateStr);
+      const today = new Date();
+      
+      // Reset hours for accurate day comparison
+      d.setHours(0,0,0,0);
+      today.setHours(0,0,0,0);
 
-  // List View Data
+      if (range === 'all_time') return true;
+      if (range === 'day') return d.getTime() === today.getTime();
+      
+      if (range === 'week') {
+          const dayOfWeek = today.getDay() || 7; // 1 (Mon) to 7 (Sun)
+          const startOfWeek = new Date(today);
+          startOfWeek.setDate(today.getDate() - dayOfWeek + 1);
+          const endOfWeek = new Date(today);
+          endOfWeek.setDate(today.getDate() + (7 - dayOfWeek));
+          return d >= startOfWeek && d <= endOfWeek;
+      }
+
+      if (range === 'month') {
+          return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+      }
+
+      if (range === 'year') {
+          return d.getFullYear() === today.getFullYear();
+      }
+
+      return true;
+  };
+
+  // Filtered Data Logic
   const filteredListTasks = useMemo(() => {
     let filtered = [...tasks];
-    if (filter === 'todo') filtered = filtered.filter(t => !t.completed);
-    if (filter === 'done') filtered = filtered.filter(t => t.completed);
+    
+    // 1. Filter by Date Range
+    filtered = filtered.filter(t => isDateInRunge(t.date, dateFilter));
+
+    // 2. Filter by Status
+    if (statusFilter === 'todo') filtered = filtered.filter(t => !t.completed);
+    if (statusFilter === 'done') filtered = filtered.filter(t => t.completed);
+    
     return filtered.sort((a, b) => b.date.localeCompare(a.date)); // Sort by date descending
-  }, [tasks, filter]);
+  }, [tasks, statusFilter, dateFilter]);
+
+  // Stats based on current filtered range (but respecting ALL statuses for counts)
+  const stats = useMemo(() => {
+    const rangeTasks = tasks.filter(t => isDateInRunge(t.date, dateFilter));
+    return {
+        all: rangeTasks.length,
+        todo: rangeTasks.filter(t => !t.completed).length,
+        done: rangeTasks.filter(t => t.completed).length,
+    };
+  }, [tasks, dateFilter]);
 
   // Export Handler
   const handleExport = () => {
@@ -118,53 +172,52 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tas
       
       const isSelected = selectedDate === dateStr;
       const isToday = new Date().toISOString().split('T')[0] === dateStr;
+      const lunarInfo = getLunarDate(dateStr);
 
       days.push(
         <button
           key={d}
           onClick={() => setSelectedDate(dateStr)}
           className={`
-            aspect-square relative rounded-xl overflow-hidden transition-all duration-200 border
+            aspect-[4/5] relative rounded-xl overflow-hidden transition-all duration-200 flex flex-col items-center justify-center gap-0.5 border
             ${isSelected 
-              ? 'bg-blue-500/20 border-blue-500 text-white ring-2 ring-blue-500/30 z-10' 
-              : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/20 text-gray-300'
+              ? 'bg-blue-600 text-white shadow-lg scale-105 z-10 border-blue-500' 
+              : isToday
+                ? 'bg-blue-500/10 border-blue-500/30 hover:bg-blue-500/20'
+                : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/20'
             }
-            ${isToday && !isSelected ? 'border-blue-400/40' : ''}
           `}
         >
-          {/* Date Number: Absolute Center to remain stable regardless of dots */}
-          <span className={`
-            absolute inset-0 flex items-center justify-center text-sm font-medium z-10 pointer-events-none select-none
-            ${isToday ? 'text-blue-400 font-bold' : ''}
+          <span className={`text-base font-medium ${isToday && !isSelected ? 'text-blue-400' : isSelected ? 'text-white' : 'text-gray-300'}`}>{d}</span>
+          <span className={`text-[10px] transform scale-90 origin-center
+                ${lunarInfo.festival 
+                    ? (isSelected ? 'text-white font-bold' : 'text-red-400 font-medium') 
+                    : lunarInfo.term 
+                        ? (isSelected ? 'text-blue-100' : 'text-emerald-400') 
+                        : (isSelected ? 'text-gray-300' : 'text-gray-500')
+                }
           `}>
-            {d}
+              {lunarInfo.festival || lunarInfo.term || lunarInfo.lunar}
           </span>
 
-          {/* Dots Layout Container */}
-          <div className="absolute inset-0 flex flex-col justify-between p-[3px] pointer-events-none">
-            
-            {/* Top Area: Completed Tasks (Green) */}
-            <div className="flex flex-wrap content-start justify-center gap-[2px] w-full max-h-[42%] overflow-hidden">
-              {completedTasks.map(t => (
-                <div 
-                  key={t.id} 
-                  className="w-1.5 h-1.5 rounded-full bg-emerald-400/90 shadow-[0_0_2px_rgba(52,211,153,0.6)]" 
-                  title={t.title}
-                />
-              ))}
-            </div>
-
-            {/* Bottom Area: Incomplete Tasks (Red) */}
-            <div className="flex flex-wrap content-end justify-center gap-[2px] w-full max-h-[42%] overflow-hidden">
-              {incompleteTasks.map(t => (
-                <div 
-                  key={t.id} 
-                  className="w-1.5 h-1.5 rounded-full bg-red-400/90 shadow-[0_0_2px_rgba(248,113,113,0.6)]"
-                  title={t.title}
-                />
-              ))}
-            </div>
-
+          {/* Dots Layout Container - Positioned at bottom */}
+          <div className="absolute bottom-1 left-0 right-0 flex justify-center gap-[1px] px-1 pointer-events-none">
+              {completedTasks.length > 0 && (
+                 <div className="flex gap-[1px]">
+                    {completedTasks.slice(0, 3).map(t => (
+                        <div key={t.id} className="w-1 h-1 rounded-full bg-emerald-400/90" />
+                    ))}
+                    {completedTasks.length > 3 && <div className="w-1 h-1 rounded-full bg-emerald-400/50" />}
+                 </div>
+              )}
+              {incompleteTasks.length > 0 && (
+                 <div className="flex gap-[1px] ml-[1px]">
+                    {incompleteTasks.slice(0, 3).map(t => (
+                        <div key={t.id} className="w-1 h-1 rounded-full bg-red-400/90" />
+                    ))}
+                    {incompleteTasks.length > 3 && <div className="w-1 h-1 rounded-full bg-red-400/50" />}
+                 </div>
+              )}
           </div>
         </button>
       );
@@ -175,7 +228,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tas
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="历史回顾与分析" className="max-w-5xl h-[85vh] flex flex-col">
       
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
         {/* View Switcher */}
         <div className="flex bg-black/20 p-1 rounded-xl border border-white/10 self-start">
           <button
@@ -226,26 +279,43 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tas
       <div className="flex-1 overflow-hidden flex flex-col">
         {viewMode === 'list' ? (
           <>
-            {/* Filters (Only for List View) */}
-            <div className="flex mb-4">
-                <div className="flex bg-black/20 p-1 rounded-xl border border-white/10">
-                {(['all', 'todo', 'done'] as Filter[]).map(f => (
-                    <button
-                    key={f}
-                    onClick={() => setFilter(f)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2
-                        ${filter === f ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-white'}
-                    `}
-                    >
-                    {f === 'all' && <BarChart3 size={16} />}
-                    {f === 'todo' && <Circle size={16} />}
-                    {f === 'done' && <CheckCircle2 size={16} />}
-                    <span>{FILTER_LABELS[f]}</span>
-                    <span className={`ml-1 px-1.5 py-0.5 rounded-md text-[10px] ${filter === f ? 'bg-white/20' : 'bg-white/5'}`}>
-                        {stats[f]}
-                    </span>
-                    </button>
-                ))}
+            {/* FILTERS ROW */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-4 p-1">
+                
+                {/* Date Range Filter */}
+                <div className="flex bg-black/20 p-1 rounded-xl border border-white/10 overflow-x-auto custom-scrollbar">
+                     {(['day', 'week', 'month', 'year', 'all_time'] as DateRangeFilter[]).map(r => (
+                        <button
+                            key={r}
+                            onClick={() => setDateFilter(r)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap
+                                ${dateFilter === r ? 'bg-white/10 text-blue-300 ring-1 ring-white/20' : 'text-gray-500 hover:text-gray-300'}
+                            `}
+                        >
+                            {DATE_FILTER_LABELS[r]}
+                        </button>
+                     ))}
+                </div>
+
+                {/* Status Filter */}
+                <div className="flex bg-black/20 p-1 rounded-xl border border-white/10 overflow-x-auto custom-scrollbar">
+                    {(['all', 'todo', 'done'] as StatusFilter[]).map(f => (
+                        <button
+                        key={f}
+                        onClick={() => setStatusFilter(f)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap
+                            ${statusFilter === f ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-white'}
+                        `}
+                        >
+                        {f === 'all' && <BarChart3 size={16} />}
+                        {f === 'todo' && <Circle size={16} />}
+                        {f === 'done' && <CheckCircle2 size={16} />}
+                        <span>{FILTER_LABELS[f]}</span>
+                        <span className={`ml-1 px-1.5 py-0.5 rounded-md text-[10px] ${statusFilter === f ? 'bg-white/20' : 'bg-white/5'}`}>
+                            {stats[f]}
+                        </span>
+                        </button>
+                    ))}
                 </div>
             </div>
 
@@ -256,7 +326,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tas
                          <div className="p-4 rounded-full bg-white/5 mb-3">
                             <List size={32} className="opacity-20" />
                          </div>
-                         暂无任务
+                         <p>该时间段无任务</p>
                     </div>
                 ) : (
                     filteredListTasks.map(task => (
@@ -267,7 +337,8 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tas
                                 task={task} 
                                 onUpdate={onUpdate} 
                                 onDelete={onDelete} 
-                                noStrikethrough={true} // Disable strikethrough for history view
+                                noStrikethrough={true} 
+                                onEdit={onEditTask}
                             />
                         </div>
                     </div>
@@ -315,7 +386,9 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tas
                             task={task} 
                             onUpdate={onUpdate} 
                             onDelete={onDelete}
-                            noStrikethrough={true} // Consistent styling in details view
+                            noStrikethrough={true} 
+                            variant="history" // Use compact/vertical layout for this narrow view
+                            onEdit={onEditTask}
                         />
                      ))
                    ) : (

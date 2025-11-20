@@ -11,6 +11,7 @@ interface TaskModalProps {
   onSave: (task: Task) => void;
   initialTask?: Task | null;
   initialQuadrant?: Quadrant | null;
+  zIndex?: string;
 }
 
 const generateId = () => {
@@ -20,7 +21,7 @@ const generateId = () => {
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
   };
 
-export const AddTaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, initialTask, initialQuadrant }) => {
+export const AddTaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, initialTask, initialQuadrant, zIndex }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -131,7 +132,7 @@ export const AddTaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={initialTask ? "编辑任务" : "新建任务"} className="max-w-xl w-full">
+    <Modal isOpen={isOpen} onClose={onClose} title={initialTask ? "编辑任务" : "新建任务"} className="max-w-xl w-full" zIndex={zIndex}>
       <div className="relative flex flex-col">
         <form onSubmit={handleSubmit} className={`flex flex-col gap-5 transition-opacity duration-300 ${isSelectingDate ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
             
