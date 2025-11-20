@@ -316,26 +316,22 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                     </div>
                 ) : null}
 
-                <div className="flex items-center gap-2 ml-1">
-                    <div className="text-slate-400 dark:text-gray-500">
+                <div className="flex items-center gap-2 ml-1 mt-2">
+                    <button 
+                        onClick={handleAddSubtask}
+                        disabled={!newSubtaskTitle.trim()}
+                        className="p-1 rounded bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/30 disabled:opacity-50 disabled:bg-transparent disabled:text-slate-400 dark:disabled:text-gray-500 transition-colors"
+                    >
                         <Plus size={14} />
-                    </div>
+                    </button>
                     <input 
                         type="text"
                         value={newSubtaskTitle}
                         onChange={(e) => setNewSubtaskTitle(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask()}
                         placeholder="新增子任务..."
-                        className="flex-1 bg-transparent text-xs text-slate-700 dark:text-gray-300 placeholder-slate-400 dark:placeholder-gray-600 focus:outline-none py-1"
+                        className="flex-1 bg-transparent text-xs text-slate-700 dark:text-gray-300 placeholder-slate-400 dark:placeholder-gray-600 focus:outline-none py-1 border-b border-transparent focus:border-blue-500/30 transition-colors"
                     />
-                    {newSubtaskTitle && (
-                        <button 
-                            onClick={handleAddSubtask}
-                            className="text-[10px] px-2 py-0.5 bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded hover:bg-blue-100 dark:hover:bg-blue-500/30 transition-colors"
-                        >
-                            添加
-                        </button>
-                    )}
                 </div>
 
                 <div className="flex justify-end pt-1">
