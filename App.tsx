@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useMemo } from 'react';
 import { Plus, History as HistoryIcon, CheckCircle2, Sparkles, Zap, LayoutGrid, Info, Trash2, Settings, Sun, Moon, HelpCircle } from 'lucide-react';
 import { Task, Quadrant, QuickNote, QUADRANT_INFO, SortConfig, StreamConfig, StreamMode, StreamSpeed } from './types';
@@ -55,12 +54,12 @@ const AmbientStreamItem = ({ id, content, type, onDelete }: { id?: string, conte
 };
 
 // Scrolling Item Component for Center Stream - Pure Display
-const ScrollingItem = ({ text }: { text: string }) => {
+const ScrollingItem: React.FC<{ text: string }> = ({ text }) => {
     return (
-        <div className="w-full flex justify-center px-4 pb-4 group relative">
+        <div className="w-full flex justify-center px-4 pb-3 group relative">
             <div className="relative max-w-full flex items-center">
                 <span className={`
-                    text-sm font-medium py-1.5 tracking-wide px-5 rounded-full border whitespace-nowrap overflow-hidden text-ellipsis shadow-sm transition-all duration-300
+                    text-sm font-medium py-1 tracking-wide px-4 rounded-full border whitespace-nowrap overflow-hidden text-ellipsis shadow-sm transition-all duration-300
                     bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 hover:shadow-md
                     dark:text-white/90 dark:bg-white/[0.05] dark:border-white/10 dark:hover:bg-white/15 dark:backdrop-blur-sm
                 `}>
@@ -760,8 +759,8 @@ export default function App() {
                             />
                         </div>
 
-                        {/* Stream - Center always scrolls - Reduced Height to h-24 (approx 96px) from h-[16rem] */}
-                        <div className="w-full h-24 relative overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)] flex items-center hover-pause">
+                        {/* Stream - Center always scrolls - Increased Height to h-52 (approx 208px) to fill space */}
+                        <div className="w-full h-52 relative overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)] flex items-center hover-pause">
                              <div className="w-full animate-scroll-vertical flex flex-col items-center" style={{ animationDuration: '80s' }}>
                                 {[...scrollingNotes, ...scrollingNotes].map((item, i) => (
                                     <ScrollingItem 
