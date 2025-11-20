@@ -46,6 +46,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
       }
   };
 
+  const getSortLabels = () => {
+    if (config.mode === 'created') return { asc: '最早', desc: '最晚' };
+    if (config.mode === 'progress') return { asc: '最低', desc: '最高' };
+    return { asc: '正序', desc: '倒序' };
+  };
+
+  const sortLabels = getSortLabels();
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="系统设置" className="max-w-lg">
        <div className="space-y-8 py-2 relative">
@@ -89,7 +97,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                 }
                              `}
                         >
-                            <ArrowUpNarrowWide size={14} /> 正序
+                            <ArrowUpNarrowWide size={14} /> {sortLabels.asc}
                         </button>
                         <button 
                              onClick={() => handleDirectionChange('desc')}
@@ -100,7 +108,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                                 }
                              `}
                         >
-                            <ArrowDownNarrowWide size={14} /> 倒序
+                            <ArrowDownNarrowWide size={14} /> {sortLabels.desc}
                         </button>
                    </div>
                )}
@@ -152,7 +160,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                            <input 
                                 type="range" 
                                 min="20" 
-                                max="150" 
+                                max="180" 
                                 step="5"
                                 value={typeof streamConfig.speed === 'number' ? streamConfig.speed : 50}
                                 onChange={handleStreamSpeedChange}

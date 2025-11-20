@@ -344,11 +344,15 @@ export default function App() {
           }
 
           if (mode === 'created') {
+              // asc: earliest (smallest timestamp) first
+              // desc: latest (largest timestamp) first
               return direction === 'asc' ? a.createdAt - b.createdAt : b.createdAt - a.createdAt;
           }
 
           if (mode === 'progress') {
               // Primary: Progress
+              // asc: lowest (0) first
+              // desc: highest (100) first
               if (a.progress !== b.progress) {
                   return direction === 'asc' ? a.progress - b.progress : b.progress - a.progress;
               }
@@ -475,19 +479,20 @@ export default function App() {
       if (streamConfig.mode === 'static') {
           if (items.length === 0) return null;
           
-          // Fill vertical space - Show 10 items (approx full screen height)
-          const pageSize = 10;
+          // Fill vertical space - Show 18 items to ensure it fills 1080p vertical screens
+          // Dynamic fill based on list looping
+          const pageSize = 18;
           const startIndex = (staticStreamIndex * pageSize) % Math.max(1, items.length);
           const visibleItems = [];
           for (let i = 0; i < pageSize; i++) {
               const item = items[(startIndex + i) % items.length];
-              if (item) visibleItems.push(item);
+              if (item) visibleItems.push({ ...item, renderKey: `${item.id}-${i}` });
           }
           
           return (
-              <div className="absolute w-full py-4 px-3 space-y-6">
-                  {visibleItems.map((item, i) => (
-                      <div key={`${item.id}-${i}`} className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <div className="absolute w-full py-4 px-3 space-y-6 overflow-hidden">
+                  {visibleItems.map((item) => (
+                      <div key={item.renderKey} className="animate-in fade-in slide-in-from-bottom-4 duration-700">
                          <AmbientStreamItem 
                             {...item} 
                             onDelete={item.type === 'note' ? handleDeleteQuickNote : undefined} 
@@ -524,8 +529,10 @@ export default function App() {
     const qTasks = quadrants[q];
     const isOver = dragOverQuadrant === q;
 
-    // Determine float direction: Top quadrants float DOWN, bottom quadrants float UP
+    // Determine float direction & z-index logic
     const isTop = q === Quadrant.Q1 || q === Quadrant.Q2;
+    // Top quadrants float DOWN, bottom float UP to avoid edges
+    // When hovered, we increase z-index to 30 to ensure overlap covers the other quadrants
     const hoverClass = isTop ? 'hover:translate-y-2' : 'hover:-translate-y-2';
 
     return (
@@ -536,22 +543,24 @@ export default function App() {
         onDrop={(e) => handleDrop(e, q)}
         className={`flex flex-col h-full rounded-2xl border backdrop-blur-sm p-4 transition-all duration-500 ease-out group relative overflow-hidden cursor-pointer z-10
           ${isOver 
-             ? `border-${info.color.split('-')[1]}-400 shadow-lg scale-[1.01] ${info.bgColor.replace('/80', '/90')} dark:bg-${info.color.split('-')[1]}-900/30` 
+             ? `border-${info.color.split('-')[1]}-400 shadow-lg scale-[1.01] ${info.bgColor.replace('/80', '/90')} dark:bg-${info.color.split('-')[1]}-900/30 z-30` 
              : `${info.bgColor} ${info.borderColor} 
-                hover:shadow-2xl hover:scale-[1.04] hover:z-30 ${hoverClass} hover:shadow-${info.color.split('-')[1]}-500/30`
+                hover:shadow-2xl hover:scale-[1.02] hover:z-30 ${hoverClass} hover:shadow-${info.color.split('-')[1]}-500/30`
           }
         `}
       >
         {/* Active Drop Glow */}
         {isOver && <div className={`absolute inset-0 bg-${info.color.split('-')[1]}-500/10 pointer-events-none z-0 animate-pulse`} />}
 
-        <div className="flex items-center justify-between mb-2 relative z-10 flex-shrink-0 pointer-events-none">
-          <div className="flex items-baseline gap-2">
-            <h2 className={`text-2xl font-bold tracking-tight ${info.color} relative`}>
-               {info.label}
-            </h2>
-            <span className="text-sm font-medium text-slate-500/80 dark:text-gray-400/80">({info.description})</span>
-          </div>
+        {/* Title Row - Description moved to right side */}
+        <div className="flex items-baseline gap-2 mb-2 relative z-10 flex-shrink-0 pointer-events-none">
+          <h2 className={`text-2xl font-bold tracking-tight ${info.color} relative`}>
+             {info.label}
+          </h2>
+          <span className="text-sm font-medium text-slate-500/80 dark:text-gray-400/80">
+             ({info.description})
+          </span>
+          <div className="flex-1" />
           <span className={`px-2.5 py-1 rounded-lg text-xs font-bold bg-white/60 dark:bg-white/10 ${info.color} border border-white/30 dark:border-white/5 shadow-sm`}>
             {qTasks.length}
           </span>
@@ -681,15 +690,30 @@ export default function App() {
                {/* 2. Bottom Control Row */}
                <div className="flex-1 flex items-end justify-between px-8 lg:px-16 gap-4 overflow-hidden pb-4">
                     
-                    {/* Left Button */}
+                    {/* Left Button - New Task (Tooltip & Enhanced Animation) */}
                     <button 
                         onClick={() => openAddModal()} 
-                        className="flex flex-col items-center justify-center gap-2 group transition-transform hover:scale-105 active:scale-95"
+                        className="flex flex-col items-center justify-center gap-2 group relative transition-transform hover:scale-110 active:scale-95"
                     >
-                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg shadow-blue-500/30 flex items-center justify-center text-white group-hover:shadow-xl transition-all">
-                             <Plus size={24} />
+                         {/* Tooltip */}
+                         <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-xl bg-slate-800/90 dark:bg-white/90 text-white dark:text-slate-900 text-xs font-bold opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 pointer-events-none whitespace-nowrap shadow-lg backdrop-blur-sm z-50">
+                            新建代办
+                            <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-slate-800/90 dark:bg-white/90 rotate-45 clip-path-triangle"></div>
                          </div>
-                         <span className="text-xs font-bold text-slate-600 dark:text-gray-300">新建代办</span>
+
+                         <div className="relative flex items-center justify-center">
+                            {/* Enhanced Spinners */}
+                            <div className="absolute inset-[-4px] rounded-full border-2 border-transparent border-t-cyan-400/50 border-r-cyan-400/50 opacity-0 group-hover:opacity-100 animate-[spin_2s_linear_infinite]"></div>
+                            <div className="absolute inset-[-2px] rounded-full border-2 border-transparent border-b-cyan-300/60 border-l-cyan-300/60 opacity-40 group-hover:opacity-100 animate-[spin_3s_linear_infinite_reverse]"></div>
+                            
+                            {/* Main Button Body */}
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 shadow-[0_0_15px_rgba(6,182,212,0.4)] flex items-center justify-center text-white group-hover:shadow-[0_0_30px_rgba(6,182,212,0.8)] transition-all duration-300 z-10">
+                                <Plus size={24} className="drop-shadow-md" />
+                            </div>
+                            
+                            {/* Inner Glow */}
+                            <div className="absolute inset-0 rounded-full bg-cyan-400/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                         </div>
                     </button>
                     
                     {/* Center Column: Input & Stream */}
@@ -710,8 +734,8 @@ export default function App() {
                             />
                         </div>
 
-                        {/* Stream - Center always scrolls */}
-                        <div className="w-full h-[12.5rem] relative overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)] flex items-center hover-pause">
+                        {/* Stream - Center always scrolls - Increased Height for 5 lines */}
+                        <div className="w-full h-[16rem] relative overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)] flex items-center hover-pause">
                              <div className="w-full animate-scroll-vertical flex flex-col items-center" style={{ animationDuration: '80s' }}>
                                 {[...scrollingNotes, ...scrollingNotes].map((item, i) => (
                                     <ScrollingItem 
@@ -723,15 +747,30 @@ export default function App() {
                         </div>
                     </div>
 
-                    {/* Right Button */}
+                    {/* Right Button - History (Tooltip & Enhanced Animation) */}
                     <button 
                         onClick={() => setIsHistoryOpen(true)} 
-                        className="flex flex-col items-center justify-center gap-2 group transition-transform hover:scale-105 active:scale-95"
+                        className="flex flex-col items-center justify-center gap-2 group relative transition-transform hover:scale-110 active:scale-95"
                     >
-                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 shadow-lg shadow-violet-500/30 flex items-center justify-center text-white group-hover:shadow-xl transition-all">
-                             <HistoryIcon size={24} />
+                         {/* Tooltip */}
+                         <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-xl bg-slate-800/90 dark:bg-white/90 text-white dark:text-slate-900 text-xs font-bold opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 pointer-events-none whitespace-nowrap shadow-lg backdrop-blur-sm z-50">
+                            历史回顾
+                            <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-slate-800/90 dark:bg-white/90 rotate-45 clip-path-triangle"></div>
                          </div>
-                         <span className="text-xs font-bold text-slate-600 dark:text-gray-300">历史回顾</span>
+
+                         <div className="relative flex items-center justify-center">
+                            {/* Enhanced Spinners */}
+                            <div className="absolute inset-[-4px] rounded-full border-2 border-transparent border-t-violet-400/50 border-r-violet-400/50 opacity-0 group-hover:opacity-100 animate-[spin_2s_linear_infinite]"></div>
+                            <div className="absolute inset-[-2px] rounded-full border-2 border-transparent border-b-violet-300/60 border-l-violet-300/60 opacity-40 group-hover:opacity-100 animate-[spin_3s_linear_infinite_reverse]"></div>
+                            
+                            {/* Main Button Body */}
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 shadow-[0_0_15px_rgba(139,92,246,0.4)] flex items-center justify-center text-white group-hover:shadow-[0_0_30px_rgba(139,92,246,0.8)] transition-all duration-300 z-10">
+                                <HistoryIcon size={24} className="drop-shadow-md" />
+                            </div>
+                            
+                            {/* Inner Glow */}
+                            <div className="absolute inset-0 rounded-full bg-violet-400/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                         </div>
                     </button>
                </div>
            </div>
@@ -746,7 +785,7 @@ export default function App() {
                          <span>数据加载中...</span>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 h-full">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-1 h-full">
                       {renderQuadrant(Quadrant.Q2)}
                       {renderQuadrant(Quadrant.Q1)}
                       {renderQuadrant(Quadrant.Q3)}
