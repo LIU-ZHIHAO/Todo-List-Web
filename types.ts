@@ -30,6 +30,7 @@ export interface Task {
   quadrant: Quadrant;
   tag: Tag;
   completed: boolean;
+  completedAt?: number; // Timestamp when completed
   progress: number; // 0 to 100
   createdAt: number;
   order: number; // For sorting

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { Plus, History as HistoryIcon, CheckCircle2, Sparkles, Zap, LayoutGrid, Info, Trash2, Settings, Sun, Moon, HelpCircle } from 'lucide-react';
 import { Task, Quadrant, QuickNote, QUADRANT_INFO, SortConfig, StreamConfig, StreamMode, StreamSpeed } from './types';
@@ -186,9 +187,10 @@ export default function App() {
           }
           
           // 2. Deadline Auto-Move Logic
-          // Rule: If Q2 (Not Urgent) -> Deadline passed/today -> Move to Q1 (Urgent)
-          // Rule: If Q3 (Not Urgent) -> Deadline passed/today -> Move to Q4 (Urgent)
-          if (!t.completed && t.date <= today) {
+          // Rule: If Q2 (Not Urgent) -> Deadline passed -> Move to Q1 (Urgent)
+          // Rule: If Q3 (Not Urgent) -> Deadline passed -> Move to Q4 (Urgent)
+          // Condition: Date STRICTLY LESS THAN today
+          if (!t.completed && t.date < today) {
                if (t.quadrant === Quadrant.Q2) {
                    newTask.quadrant = Quadrant.Q1;
                    newTask.isOverdue = true;
@@ -196,6 +198,16 @@ export default function App() {
                } else if (t.quadrant === Quadrant.Q3) {
                    newTask.quadrant = Quadrant.Q4;
                    newTask.isOverdue = true;
+                   modified = true;
+               } else if (!t.isOverdue) {
+                   // Mark as overdue if not already (e.g. already in Q1/Q4)
+                   newTask.isOverdue = true;
+                   modified = true;
+               }
+          } else {
+               // Reset isOverdue if date is today or future (or task completed)
+               if (t.isOverdue) {
+                   newTask.isOverdue = false;
                    modified = true;
                }
           }
@@ -272,14 +284,45 @@ export default function App() {
       }
   };
 
+  // Helper for overdue check
+  const checkIsOverdue = (dateStr: string) => {
+      const today = new Date().toISOString().split('T')[0];
+      return dateStr < today;
+  };
+
   // Task CRUD
   const handleSaveTask = async (task: Task) => {
-    if (editingTask) {
-        await withSaveStatus(dbService.updateTask(task));
-        setTasks(prev => prev.map(t => t.id === task.id ? task : t));
+    const processedTask = { ...task };
+    
+    // 1. Update isOverdue state based on new date
+    if (!processedTask.completed && checkIsOverdue(processedTask.date)) {
+        processedTask.isOverdue = true;
     } else {
-        await withSaveStatus(dbService.addTask(task));
-        setTasks(prev => [task, ...prev]);
+        processedTask.isOverdue = false;
+    }
+
+    // 2. Update completedAt
+    if (processedTask.completed && !processedTask.completedAt) {
+        // If editing existing completed task, prefer keeping original time if available
+        // But Modal input represents new state.
+        // If editingTask was completed, assume we keep its time unless it was uncompleted.
+        // If this is a new completion action (via edit modal toggle? Modal doesn't have toggle),
+        // Modal usually saves properties. completed status is inherited from initialTask.
+        if (editingTask && editingTask.completed) {
+            processedTask.completedAt = editingTask.completedAt;
+        } else {
+            processedTask.completedAt = Date.now();
+        }
+    } else if (!processedTask.completed) {
+        processedTask.completedAt = undefined;
+    }
+
+    if (editingTask) {
+        await withSaveStatus(dbService.updateTask(processedTask));
+        setTasks(prev => prev.map(t => t.id === processedTask.id ? processedTask : t));
+    } else {
+        await withSaveStatus(dbService.addTask(processedTask));
+        setTasks(prev => [processedTask, ...prev]);
     }
     setIsTaskModalOpen(false);
     setEditingTask(null);
@@ -292,8 +335,25 @@ export default function App() {
   };
 
   const handleTaskUpdate = async (updatedTask: Task) => {
-    await withSaveStatus(dbService.updateTask(updatedTask));
-    setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+    const processedTask = { ...updatedTask };
+
+    // 1. Update isOverdue state (in case date changed or status changed)
+    if (!processedTask.completed && checkIsOverdue(processedTask.date)) {
+        processedTask.isOverdue = true;
+    } else {
+        processedTask.isOverdue = false;
+    }
+
+    // 2. Update completedAt
+    // Logic: If marked completed and has no time, set it. If marked incomplete, clear it.
+    if (processedTask.completed && !processedTask.completedAt) {
+        processedTask.completedAt = Date.now();
+    } else if (!processedTask.completed) {
+        processedTask.completedAt = undefined;
+    }
+
+    await withSaveStatus(dbService.updateTask(processedTask));
+    setTasks(prev => prev.map(t => t.id === processedTask.id ? processedTask : t));
   };
 
   const handleImportData = async (importedTasks: Task[], importedNotes: QuickNote[]) => {
@@ -450,10 +510,20 @@ export default function App() {
           quadrant: targetQuadrant,
           order: newOrder
       };
-
+      
+      // Recalculate overdue/completion logic during drop just in case (though usually date doesn't change on drop)
+      // But dragging might happen across sessions or contexts.
+      // It's safer to call handleTaskUpdate logic, but handleTaskUpdate expects void return and updates state.
+      // Here we manually update state and DB.
+      // Let's reuse handleTaskUpdate for consistency?
+      // handleTaskUpdate updates DB and State.
+      // But handleDrop needs specific order logic already calculated.
+      // We will just call updateTask directly for the order/quadrant change. 
+      // completedAt/isOverdue shouldn't change just by moving quadrant (unless we add logic for that, which we won't for now).
+      
+      await withSaveStatus(dbService.updateTask(updatedTask));
       setTasks(prev => prev.map(t => t.id === draggedTaskId ? updatedTask : t));
       setDraggedTaskId(null);
-      await dbService.updateTask(updatedTask);
   };
 
   // Ambient Stream Logic
