@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { Plus, History as HistoryIcon, CheckCircle2, Sparkles, Zap, LayoutGrid, Info, Trash2, Settings, Sun, Moon, HelpCircle } from 'lucide-react';
-import { Task, Quadrant, QuickNote, QUADRANT_INFO, SortConfig } from './types';
+import { Task, Quadrant, QuickNote, QUADRANT_INFO, SortConfig, StreamConfig, StreamMode, StreamSpeed } from './types';
 import { dbService } from './services/db';
 import { TaskCard } from './components/TaskCard';
 import { AddTaskModal } from './components/AddTaskModal';
@@ -157,6 +157,15 @@ export default function App() {
     return saved ? JSON.parse(saved) : { mode: 'custom', direction: 'asc' };
   });
 
+  // Stream Config State
+  const [streamConfig, setStreamConfig] = useState<StreamConfig>(() => {
+    const saved = localStorage.getItem('streamConfig');
+    return saved ? JSON.parse(saved) : { mode: 'scroll', speed: 'medium' };
+  });
+  
+  // For static stream rotation
+  const [staticStreamIndex, setStaticStreamIndex] = useState(0);
+
   // Drag State
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverQuadrant, setDragOverQuadrant] = useState<Quadrant | null>(null);
@@ -205,10 +214,24 @@ export default function App() {
     fetchAllData();
   }, []);
 
-  // Persist Sort Config
+  // Persist Configs
   useEffect(() => {
     localStorage.setItem('sortConfig', JSON.stringify(sortConfig));
   }, [sortConfig]);
+
+  useEffect(() => {
+    localStorage.setItem('streamConfig', JSON.stringify(streamConfig));
+  }, [streamConfig]);
+
+  // Static Stream Rotation Timer
+  useEffect(() => {
+      if (streamConfig.mode === 'static') {
+          const interval = setInterval(() => {
+              setStaticStreamIndex(prev => prev + 1);
+          }, 10000);
+          return () => clearInterval(interval);
+      }
+  }, [streamConfig.mode]);
 
   const withSaveStatus = async (operation: Promise<void>) => {
     setSaveStatus('saving');
@@ -219,6 +242,29 @@ export default function App() {
       console.error(e);
       setSaveStatus('saved');
     }
+  };
+
+  // Data Clearing
+  const handleClearData = async (type: 'tasks' | 'notes' | 'all') => {
+      setSaveStatus('saving');
+      try {
+          if (type === 'tasks') {
+              await dbService.clearTasks();
+              setTasks([]);
+          } else if (type === 'notes') {
+              await dbService.clearQuickNotes();
+              setQuickNotes([]);
+          } else if (type === 'all') {
+              await dbService.resetDatabase();
+              setTasks([]);
+              setQuickNotes([]);
+          }
+          setTimeout(() => setSaveStatus('saved'), 800);
+      } catch (e) {
+          console.error(e);
+          setSaveStatus('saved');
+          alert('操作失败，请重试');
+      }
   };
 
   // Task CRUD
@@ -401,16 +447,22 @@ export default function App() {
       await dbService.updateTask(updatedTask);
   };
 
-  // Ambient Stream
+  // Ambient Stream Logic
   const streamItems = useMemo(() => {
     const completed = tasks.filter(t => t.completed).map(t => ({ id: t.id, content: t.title, type: 'task' as const }));
     const notes = quickNotes.map(n => ({ id: n.id, content: n.content, type: 'note' as const }));
-    return [...completed, ...notes].sort(() => Math.random() - 0.5);
+    const combined = [...completed, ...notes].sort(() => Math.random() - 0.5);
+    
+    // Ensure we have enough items for static display or scrolling
+    if (combined.length === 0) return [];
+    
+    // For scrolling, we usually duplicate. For static, we just need the list.
+    return combined;
   }, [tasks, quickNotes]);
   
   const leftStream = useMemo(() => streamItems.filter((_, i) => i % 2 === 0), [streamItems]);
   const rightStream = useMemo(() => streamItems.filter((_, i) => i % 2 !== 0), [streamItems]);
-  
+
   const scrollingNotes = useMemo(() => {
     const contentSource = quickNotes.length > 0 
         ? quickNotes.map(n => ({ id: n.id, content: n.content })) 
@@ -420,6 +472,68 @@ export default function App() {
     while (items.length < 20) items = [...items, ...contentSource]; 
     return items.slice(0, 60);
   }, [quickNotes]);
+
+  // Determine animation duration based on config
+  const getAnimationDuration = () => {
+      switch (streamConfig.speed) {
+          case 'fast': return '40s';
+          case 'medium': return '80s';
+          case 'slow': return '120s';
+          default: return '80s';
+      }
+  };
+
+  // Render Side Stream Content
+  const renderSideStream = (items: typeof leftStream, isRight: boolean) => {
+      if (streamConfig.mode === 'hidden') return null;
+
+      // STATIC MODE
+      if (streamConfig.mode === 'static') {
+          if (items.length === 0) return null;
+          
+          // Show 4 items, rotated by staticStreamIndex
+          const pageSize = 4;
+          const startIndex = (staticStreamIndex * pageSize) % Math.max(1, items.length);
+          const visibleItems = [];
+          for (let i = 0; i < pageSize; i++) {
+              const item = items[(startIndex + i) % items.length];
+              if (item) visibleItems.push(item);
+          }
+          
+          return (
+              <div className="absolute w-full py-10 px-3 space-y-6">
+                  {visibleItems.map((item, i) => (
+                      <div key={`${item.id}-${i}`} className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                         <AmbientStreamItem 
+                            {...item} 
+                            onDelete={item.type === 'note' ? handleDeleteQuickNote : undefined} 
+                         />
+                      </div>
+                  ))}
+              </div>
+          );
+      }
+
+      // SCROLL MODE
+      // Duplicate items for seamless loop
+      const scrollItems = [...items, ...items, ...items];
+      const animationClass = isRight ? 'animate-float-down' : 'animate-float-up';
+      
+      return (
+          <div 
+            className={`absolute w-full py-10 ${animationClass} hover-pause px-3 space-y-6 opacity-80 hover:opacity-100 transition-opacity duration-500`}
+            style={{ animationDuration: getAnimationDuration() }}
+          >
+             {scrollItems.map((item, i) => (
+                <AmbientStreamItem 
+                    key={`${isRight ? 'r' : 'l'}-${i}`} 
+                    {...item} 
+                    onDelete={item.type === 'note' ? handleDeleteQuickNote : undefined} 
+                />
+             ))}
+          </div>
+      );
+  };
 
   const renderQuadrant = (q: Quadrant) => {
     const info = QUADRANT_INFO[q];
@@ -512,22 +626,14 @@ export default function App() {
       <div className="flex flex-1 h-full overflow-hidden">
         
         {/* Left Ambient Stream */}
-        <aside className="hidden xl:block w-[12.5%] h-full overflow-hidden relative border-r border-slate-200 dark:border-white/5 bg-white/40 dark:bg-slate-900/20 flex-shrink-0 transition-colors duration-500">
+        <aside className={`hidden xl:block w-[12.5%] h-full overflow-hidden relative border-r border-slate-200 dark:border-white/5 bg-white/40 dark:bg-slate-900/20 flex-shrink-0 transition-colors duration-500 ${streamConfig.mode === 'hidden' ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-slate-50 dark:from-[#0f172a] to-transparent z-10 pointer-events-none transition-colors"></div>
           <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-slate-50 dark:from-[#0f172a] to-transparent z-10 pointer-events-none transition-colors"></div>
-          <div className="absolute w-full py-10 animate-float-up hover-pause px-3 space-y-6 opacity-80 hover:opacity-100 transition-opacity duration-500">
-             {[...leftStream, ...leftStream, ...leftStream].map((item, i) => (
-                <AmbientStreamItem 
-                    key={`l-${i}`} 
-                    {...item} 
-                    onDelete={item.type === 'note' ? handleDeleteQuickNote : undefined} 
-                />
-             ))}
-          </div>
+          {renderSideStream(leftStream, false)}
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 w-[75%] max-w-[75%] flex flex-col h-full relative z-10 transition-colors duration-500">
+        <main className={`flex-1 flex flex-col h-full relative z-10 transition-colors duration-500 ${streamConfig.mode === 'hidden' ? 'max-w-[100%] w-full' : 'w-[75%] max-w-[75%]'}`}>
            
            {/* Top Section */}
            <div className="h-[34%] flex flex-col w-full relative pb-4">
@@ -618,7 +724,7 @@ export default function App() {
                             />
                         </div>
 
-                        {/* Stream - No delete here */}
+                        {/* Stream - Center always scrolls per spec, but we could reuse logic if needed. Keeping as is for "Core Stream" */}
                         <div className="w-full h-[12.5rem] relative overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)] flex items-center hover-pause">
                              <div className="w-full animate-scroll-vertical flex flex-col items-center space-y-3" style={{ animationDuration: '80s' }}>
                                 {[...scrollingNotes, ...scrollingNotes].map((item, i) => (
@@ -667,18 +773,10 @@ export default function App() {
         </main>
 
         {/* Right Ambient Stream */}
-        <aside className="hidden xl:block w-[12.5%] h-full overflow-hidden relative border-l border-slate-200 dark:border-white/5 bg-white/40 dark:bg-slate-900/20 flex-shrink-0 transition-colors duration-500">
+        <aside className={`hidden xl:block w-[12.5%] h-full overflow-hidden relative border-l border-slate-200 dark:border-white/5 bg-white/40 dark:bg-slate-900/20 flex-shrink-0 transition-colors duration-500 ${streamConfig.mode === 'hidden' ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-slate-50 dark:from-[#0f172a] to-transparent z-10 pointer-events-none transition-colors"></div>
           <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-slate-50 dark:from-[#0f172a] to-transparent z-10 pointer-events-none transition-colors"></div>
-          <div className="absolute w-full py-10 animate-float-down hover-pause px-3 space-y-6 opacity-80 hover:opacity-100 transition-opacity duration-500">
-             {[...rightStream, ...rightStream, ...rightStream].map((item, i) => (
-                <AmbientStreamItem 
-                    key={`r-${i}`} 
-                    {...item} 
-                    onDelete={item.type === 'note' ? handleDeleteQuickNote : undefined} 
-                />
-             ))}
-          </div>
+          {renderSideStream(rightStream, true)}
         </aside>
 
       </div>
@@ -707,6 +805,9 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         config={sortConfig}
         onUpdate={(newConfig) => setSortConfig(newConfig)}
+        streamConfig={streamConfig}
+        onUpdateStream={(newConfig) => setStreamConfig(newConfig)}
+        onClearData={handleClearData}
       />
       
       <HelpModal

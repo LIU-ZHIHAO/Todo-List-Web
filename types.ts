@@ -49,6 +49,14 @@ export interface SortConfig {
   direction: SortDirection;
 }
 
+export type StreamMode = 'static' | 'scroll' | 'hidden';
+export type StreamSpeed = 'slow' | 'medium' | 'fast';
+
+export interface StreamConfig {
+  mode: StreamMode;
+  speed: StreamSpeed;
+}
+
 export const TAG_COLORS: Record<Tag, string> = {
   [Tag.STUDY]: 'bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]',
   [Tag.LIFE]: 'bg-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.4)]',

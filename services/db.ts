@@ -118,6 +118,18 @@ export class DBService {
     });
   }
 
+  async clearTasks(): Promise<void> {
+    const db = await this.dbPromise;
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_TASKS, 'readwrite');
+      const store = transaction.objectStore(STORE_TASKS);
+      const request = store.clear();
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
   // --- Quick Notes ---
 
   async getAllQuickNotes(): Promise<QuickNote[]> {
@@ -183,6 +195,31 @@ export class DBService {
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
+  }
+
+  async clearQuickNotes(): Promise<void> {
+    const db = await this.dbPromise;
+    return new Promise((resolve, reject) => {
+      if (!db.objectStoreNames.contains(STORE_NOTES)) {
+        resolve();
+        return;
+      }
+      const transaction = db.transaction(STORE_NOTES, 'readwrite');
+      const store = transaction.objectStore(STORE_NOTES);
+      const request = store.clear();
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async resetDatabase(): Promise<void> {
+      try {
+          await this.clearTasks();
+          await this.clearQuickNotes();
+      } catch (e) {
+          throw e;
+      }
   }
 }
 
