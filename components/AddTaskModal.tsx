@@ -259,7 +259,7 @@ export const AddTaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave
                     <LayoutGrid size={12} /> 优先级象限
                 </label>
                 <div className="grid grid-cols-2 gap-3">
-                    {[Quadrant.Q2, Quadrant.Q1, Quadrant.Q4, Quadrant.Q3].map((q) => {
+                    {[Quadrant.Q2, Quadrant.Q1, Quadrant.Q3, Quadrant.Q4].map((q) => {
                         const info = QUADRANT_INFO[q];
                         const isSelected = quadrant === q;
                         const baseStyle = `${info.bgColor} ${info.borderColor}`;
@@ -367,3 +367,4 @@ const CheckCircleIcon = ({ className }: { className: string }) => (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
     </svg>
 );
+    
