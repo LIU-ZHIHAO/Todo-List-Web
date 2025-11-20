@@ -1,24 +1,25 @@
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Modal } from './ui/Modal';
-import { Task, QUADRANT_INFO } from '../types';
+import { Task, QUADRANT_INFO, QuickNote } from '../types';
 import { TaskCard } from './TaskCard';
-import { List, Calendar as CalendarIcon, CheckCircle2, Circle, BarChart3, Download, Upload, Database, CalendarRange, CalendarDays, Clock } from 'lucide-react';
+import { List, Calendar as CalendarIcon, CheckCircle2, Circle, BarChart3, Download, Upload, Database, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getLunarDate } from '../utils/lunar';
 
 interface HistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   tasks: Task[];
+  quickNotes?: QuickNote[]; // Added support for exporting quick notes
   onDelete: (id: string) => void;
   onUpdate: (task: Task) => void;
-  onImport?: (tasks: Task[]) => void;
+  onImport?: (tasks: Task[], notes: QuickNote[]) => void;
   onEditTask?: (task: Task) => void;
 }
 
 type ViewMode = 'list' | 'calendar';
 type StatusFilter = 'all' | 'todo' | 'done';
-type DateRangeFilter = 'day' | 'week' | 'month' | 'year' | 'all_time';
+type DateRangeFilter = 'day' | 'week' | 'month' | 'year';
 
 const FILTER_LABELS = {
   all: '全部状态',
@@ -27,48 +28,112 @@ const FILTER_LABELS = {
 };
 
 const DATE_FILTER_LABELS = {
-  day: '今天',
-  week: '本周',
-  month: '本月',
-  year: '本年',
-  all_time: '全部时间'
+  day: '按日',
+  week: '按周',
+  month: '按月',
+  year: '按年',
 };
 
-export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tasks, onDelete, onUpdate, onImport, onEditTask }) => {
+export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tasks, quickNotes = [], onDelete, onUpdate, onImport, onEditTask }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [dateFilter, setDateFilter] = useState<DateRangeFilter>('week'); // Default to Week
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null); // For Calendar Details
+  const [currentMonth, setCurrentMonth] = useState(new Date()); // For Calendar Navigation
+  const [filterDate, setFilterDate] = useState(new Date()); // For List View Date Navigation
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Date Helper Logic
-  const isDateInRunge = (dateStr: string, range: DateRangeFilter): boolean => {
-      const d = new Date(dateStr);
-      const today = new Date();
-      
-      // Reset hours for accurate day comparison
-      d.setHours(0,0,0,0);
-      today.setHours(0,0,0,0);
+  // Reset filter date when modal opens
+  useEffect(() => {
+      if (isOpen) {
+          setFilterDate(new Date());
+      }
+  }, [isOpen]);
 
-      if (range === 'all_time') return true;
-      if (range === 'day') return d.getTime() === today.getTime();
+  // --- Date Navigation Helpers (List View) ---
+
+  const handlePrevRange = () => {
+      const d = new Date(filterDate);
+      switch (dateFilter) {
+          case 'day': d.setDate(d.getDate() - 1); break;
+          case 'week': d.setDate(d.getDate() - 7); break;
+          case 'month': d.setMonth(d.getMonth() - 1); break;
+          case 'year': d.setFullYear(d.getFullYear() - 1); break;
+      }
+      setFilterDate(d);
+  };
+
+  const handleNextRange = () => {
+      const d = new Date(filterDate);
+      switch (dateFilter) {
+          case 'day': d.setDate(d.getDate() + 1); break;
+          case 'week': d.setDate(d.getDate() + 7); break;
+          case 'month': d.setMonth(d.getMonth() + 1); break;
+          case 'year': d.setFullYear(d.getFullYear() + 1); break;
+      }
+      setFilterDate(d);
+  };
+
+  const getRangeLabel = () => {
+      const y = filterDate.getFullYear();
+      const m = filterDate.getMonth() + 1;
+      const d = filterDate.getDate();
+
+      if (dateFilter === 'day') {
+          return `${y}年${m}月${d}日`;
+      }
+      if (dateFilter === 'month') {
+          return `${y}年${m}月`;
+      }
+      if (dateFilter === 'year') {
+          return `${y}年`;
+      }
+      if (dateFilter === 'week') {
+           // Find start (Monday) and end (Sunday) of the week
+           const currentDay = filterDate.getDay() || 7; 
+           const start = new Date(filterDate);
+           start.setDate(filterDate.getDate() - currentDay + 1);
+           const end = new Date(filterDate);
+           end.setDate(filterDate.getDate() + (7 - currentDay));
+           
+           return `${start.getMonth()+1}月${start.getDate()}日 - ${end.getMonth()+1}月${end.getDate()}日`;
+      }
+      return '';
+  };
+
+  // --- Filtering Logic ---
+
+  const isDateInRunge = (dateStr: string, range: DateRangeFilter, targetDate: Date): boolean => {
+      const d = new Date(dateStr);
+      const current = new Date(targetDate);
+      
+      // Reset hours for accurate comparison
+      d.setHours(0,0,0,0);
+      current.setHours(0,0,0,0);
+
+      if (range === 'day') {
+          return d.getTime() === current.getTime();
+      }
       
       if (range === 'week') {
-          const dayOfWeek = today.getDay() || 7; // 1 (Mon) to 7 (Sun)
-          const startOfWeek = new Date(today);
-          startOfWeek.setDate(today.getDate() - dayOfWeek + 1);
-          const endOfWeek = new Date(today);
-          endOfWeek.setDate(today.getDate() + (7 - dayOfWeek));
-          return d >= startOfWeek && d <= endOfWeek;
+          const currentDayOfWeek = current.getDay() || 7; // 1-7
+          const startOfWeek = new Date(current);
+          startOfWeek.setDate(current.getDate() - currentDayOfWeek + 1);
+          startOfWeek.setHours(0,0,0,0);
+
+          const endOfWeek = new Date(current);
+          endOfWeek.setDate(current.getDate() + (7 - currentDayOfWeek));
+          endOfWeek.setHours(23,59,59,999);
+
+          return d.getTime() >= startOfWeek.getTime() && d.getTime() <= endOfWeek.getTime();
       }
 
       if (range === 'month') {
-          return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+          return d.getMonth() === current.getMonth() && d.getFullYear() === current.getFullYear();
       }
 
       if (range === 'year') {
-          return d.getFullYear() === today.getFullYear();
+          return d.getFullYear() === current.getFullYear();
       }
 
       return true;
@@ -78,29 +143,36 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tas
   const filteredListTasks = useMemo(() => {
     let filtered = [...tasks];
     
-    // 1. Filter by Date Range
-    filtered = filtered.filter(t => isDateInRunge(t.date, dateFilter));
+    // 1. Filter by Date Range (using filterDate)
+    filtered = filtered.filter(t => isDateInRunge(t.date, dateFilter, filterDate));
 
     // 2. Filter by Status
     if (statusFilter === 'todo') filtered = filtered.filter(t => !t.completed);
     if (statusFilter === 'done') filtered = filtered.filter(t => t.completed);
     
     return filtered.sort((a, b) => b.date.localeCompare(a.date)); // Sort by date descending
-  }, [tasks, statusFilter, dateFilter]);
+  }, [tasks, statusFilter, dateFilter, filterDate]);
 
   // Stats based on current filtered range (but respecting ALL statuses for counts)
   const stats = useMemo(() => {
-    const rangeTasks = tasks.filter(t => isDateInRunge(t.date, dateFilter));
+    const rangeTasks = tasks.filter(t => isDateInRunge(t.date, dateFilter, filterDate));
     return {
         all: rangeTasks.length,
         todo: rangeTasks.filter(t => !t.completed).length,
         done: rangeTasks.filter(t => t.completed).length,
     };
-  }, [tasks, dateFilter]);
+  }, [tasks, dateFilter, filterDate]);
 
-  // Export Handler
+  // Export Handler (Includes Quick Notes now)
   const handleExport = () => {
-    const dataStr = JSON.stringify(tasks, null, 2);
+    const exportData = {
+        version: 2,
+        exportDate: new Date().toISOString(),
+        tasks: tasks,
+        quickNotes: quickNotes
+    };
+    
+    const dataStr = JSON.stringify(exportData, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -112,7 +184,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tas
     URL.revokeObjectURL(url);
   };
 
-  // Import Handler
+  // Import Handler (Handles new format with quickNotes)
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -121,19 +193,31 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tas
     reader.onload = (event) => {
       try {
         const content = event.target?.result as string;
-        const importedTasks = JSON.parse(content) as Task[];
+        const data = JSON.parse(content);
         
-        if (Array.isArray(importedTasks) && importedTasks.every(t => t.id && t.title)) {
-          if (window.confirm(`确认导入 ${importedTasks.length} 个任务吗？这将合并到当前列表。`)) {
-            onImport?.(importedTasks);
-            alert('导入成功！');
-          }
+        let tasksToImport: Task[] = [];
+        let notesToImport: QuickNote[] = [];
+
+        if (Array.isArray(data)) {
+            // Legacy format (just array of tasks)
+            tasksToImport = data;
+        } else if (data.tasks || data.quickNotes) {
+            // New format
+            tasksToImport = data.tasks || [];
+            notesToImport = data.quickNotes || [];
         } else {
-          alert('文件格式错误，请使用本应用导出的 JSON 文件。');
+            throw new Error("Invalid format");
+        }
+        
+        const totalCount = tasksToImport.length + notesToImport.length;
+
+        if (window.confirm(`确认导入 ${tasksToImport.length} 个任务和 ${notesToImport.length} 条闪念吗？`)) {
+            onImport?.(tasksToImport, notesToImport);
+            alert('导入成功！');
         }
       } catch (error) {
         console.error(error);
-        alert('解析文件失败');
+        alert('文件格式错误，请使用本应用导出的 JSON 文件。');
       }
     };
     reader.readAsText(file);
@@ -253,7 +337,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tas
         <div className="flex items-center gap-2 self-start md:self-auto">
             <div className="px-3 py-2 bg-white/5 rounded-lg border border-white/10 flex items-center gap-2 text-xs text-gray-400 mr-2 hidden md:flex">
                 <Database size={14} />
-                <span>本地数据库: {tasks.length} 条记录</span>
+                <span>本地: {tasks.length} 任务 / {quickNotes.length} 闪念</span>
             </div>
             <button
                 onClick={handleExport}
@@ -282,19 +366,35 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, tas
             {/* FILTERS ROW */}
             <div className="flex flex-col sm:flex-row gap-4 mb-4 p-1">
                 
-                {/* Date Range Filter */}
-                <div className="flex bg-black/20 p-1 rounded-xl border border-white/10 overflow-x-auto custom-scrollbar">
-                     {(['day', 'week', 'month', 'year', 'all_time'] as DateRangeFilter[]).map(r => (
-                        <button
-                            key={r}
-                            onClick={() => setDateFilter(r)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap
-                                ${dateFilter === r ? 'bg-white/10 text-blue-300 ring-1 ring-white/20' : 'text-gray-500 hover:text-gray-300'}
-                            `}
-                        >
-                            {DATE_FILTER_LABELS[r]}
+                {/* Date Range Filter & Navigation */}
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* Filter Type Tabs */}
+                    <div className="flex bg-black/20 p-1 rounded-xl border border-white/10">
+                        {(['day', 'week', 'month', 'year'] as DateRangeFilter[]).map(r => (
+                            <button
+                                key={r}
+                                onClick={() => { setDateFilter(r); setFilterDate(new Date()); }}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap
+                                    ${dateFilter === r ? 'bg-white/10 text-blue-300 ring-1 ring-white/20' : 'text-gray-500 hover:text-gray-300'}
+                                `}
+                            >
+                                {DATE_FILTER_LABELS[r]}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Navigation Controls */}
+                    <div className="flex items-center bg-white/5 rounded-lg border border-white/10 p-1">
+                        <button onClick={handlePrevRange} className="p-1.5 hover:bg-white/10 rounded-md text-gray-400 hover:text-white transition-colors">
+                            <ChevronLeft size={16} />
                         </button>
-                     ))}
+                        <span className="px-3 text-sm font-mono text-blue-100 min-w-[100px] text-center select-none">
+                            {getRangeLabel()}
+                        </span>
+                        <button onClick={handleNextRange} className="p-1.5 hover:bg-white/10 rounded-md text-gray-400 hover:text-white transition-colors">
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Status Filter */}

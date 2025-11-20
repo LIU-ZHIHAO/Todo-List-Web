@@ -8,6 +8,8 @@ import { AddTaskModal } from './components/AddTaskModal';
 import { HistoryModal } from './components/HistoryModal';
 import { AuthorModal } from './components/AuthorModal';
 
+const APP_VERSION = '1.1.0';
+
 // Helper component for floating items
 const AmbientStreamItem = ({ content, type }: { content: string; type: 'note' | 'task' }) => (
   <div className={`
@@ -163,12 +165,33 @@ export default function App() {
     setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
   };
 
-  const handleImportTasks = async (importedTasks: Task[]) => {
+  const handleImportData = async (importedTasks: Task[], importedNotes: QuickNote[]) => {
     setSaveStatus('saving');
     try {
-      for (const task of importedTasks) {
-        await dbService.updateTask(task);
+      // Import Tasks
+      if (importedTasks && importedTasks.length > 0) {
+          for (const task of importedTasks) {
+            await dbService.updateTask(task);
+          }
       }
+      
+      // Import Notes
+      if (importedNotes && importedNotes.length > 0) {
+          for (const note of importedNotes) {
+            // Check if exists or simple add (since DB key is ID)
+            // We use update semantics by using put in DB service usually, but here notes are add-only in UI usually
+            // But for import, we treat as add/overwrite
+            // Since dbService.addQuickNote uses .add(), it might fail if key exists.
+            // Let's use bulkAddQuickNotes which uses .add(), so we might want to be careful or catch errors.
+            // For simplicity in this updated App, we'll just iterate and try adding.
+            try {
+                await dbService.addQuickNote(note);
+            } catch (e) {
+                // Ignore duplicate key errors
+            }
+          }
+      }
+
       await fetchAllData();
       setTimeout(() => setSaveStatus('saved'), 800);
     } catch (e) {
@@ -309,23 +332,27 @@ export default function App() {
 
         <div className="flex items-center justify-between mb-2 relative z-10 flex-shrink-0 pointer-events-none">
           <div>
-            <h2 className={`text-2xl font-bold ${info.color}`}>{info.label}</h2>
-            <p className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors mt-1">{info.description}</p>
+            <h2 className="text-2xl font-bold tracking-tight relative">
+               <span className={`absolute -inset-1 blur-md ${info.color} opacity-20`}></span>
+               <span className={`relative ${info.color}`}>{info.label}</span>
+            </h2>
+            <p className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors mt-1 font-medium tracking-wide">{info.description}</p>
           </div>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-bold bg-white/10 ${info.color} border border-white/5`}>
+          <span className={`px-2.5 py-1 rounded-lg text-xs font-bold bg-white/10 ${info.color} border border-white/5 shadow-inner`}>
             {qTasks.length}
           </span>
         </div>
         
         <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar pr-1 relative z-10 pb-2">
           {qTasks.length === 0 && !isOver ? (
-            <div className="h-full flex flex-col items-center justify-center text-gray-500/40 border-2 border-dashed border-gray-500/10 rounded-xl p-4 select-none">
-              <span className="text-xs">点击空白处新建任务</span>
+            <div className="h-full flex flex-col items-center justify-center text-gray-500/40 border-2 border-dashed border-gray-500/10 rounded-xl p-4 select-none hover:border-gray-500/20 transition-colors">
+              <Plus size={24} className="mb-2 opacity-50" />
+              <span className="text-xs font-medium">点击空白处新建任务</span>
             </div>
           ) : (
             <>
                 {qTasks.map(task => (
-                <div key={task.id} onClick={(e) => e.stopPropagation()} className="cursor-auto">
+                <div key={task.id} onClick={(e) => e.stopPropagation()} className="cursor-auto transform transition-transform duration-200 hover:scale-[1.01]">
                     <TaskCard 
                         task={task} 
                         onUpdate={handleTaskUpdate} 
@@ -384,8 +411,8 @@ export default function App() {
                
                {/* 1. Header */}
                <header className="flex-shrink-0 flex items-center justify-center px-8 relative z-20 h-10 mb-1 pt-4">
-                  <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.4)] ring-1 ring-white/20">
+                  <div className="flex items-center gap-2 group cursor-default">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.4)] ring-1 ring-white/20 group-hover:scale-105 transition-transform duration-300">
                           <LayoutGrid size={18} className="text-white" />
                       </div>
                       <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-gray-300 tracking-tight drop-shadow-[0_2px_10px_rgba(255,255,255,0.2)]">
@@ -398,13 +425,13 @@ export default function App() {
                     <button onClick={() => setIsAuthorModalOpen(true)} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-300 hover:bg-white/5 transition-colors" title="志豪的设计作品">
                         <Info size={16} />
                     </button>
-                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/20 border border-white/5">
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/20 border border-white/5 backdrop-blur-sm">
                         {saveStatus === 'saving' ? (
-                           <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
+                           <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse shadow-[0_0_5px_rgba(250,204,21,0.5)]" />
                         ) : (
-                           <CheckCircle2 size={12} className="text-emerald-400" />
+                           <CheckCircle2 size={12} className="text-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.5)]" />
                         )}
-                        <span className="text-[10px] text-gray-400 font-medium">
+                        <span className="text-[10px] text-gray-400 font-medium tracking-wide">
                           {saveStatus === 'saving' ? '同步中...' : '已同步'}
                         </span>
                     </div>
@@ -475,9 +502,12 @@ export default function App() {
 
            {/* Bottom Section: Quadrants */}
            <div className="h-[66%] p-6 pt-0 overflow-hidden">
-               <div className="h-full rounded-3xl border border-white/5 bg-black/20 p-1 shadow-2xl">
+               <div className="h-full rounded-3xl border border-white/5 bg-black/20 p-1 shadow-2xl backdrop-blur-md">
                   {loading ? (
-                    <div className="flex items-center justify-center h-full text-gray-400">数据加载中...</div>
+                    <div className="flex items-center justify-center h-full text-gray-400 gap-2">
+                         <div className="w-5 h-5 rounded-full border-2 border-blue-500/30 border-t-blue-500 animate-spin"></div>
+                         <span>数据加载中...</span>
+                    </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-1 h-full">
                       {renderQuadrant(Quadrant.Q2)}
@@ -506,15 +536,17 @@ export default function App() {
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
         tasks={tasks}
+        quickNotes={quickNotes}
         onDelete={handleTaskDelete}
         onUpdate={handleTaskUpdate}
-        onImport={handleImportTasks}
+        onImport={handleImportData}
         onEditTask={openEditModal}
       />
 
       <AuthorModal
         isOpen={isAuthorModalOpen}
         onClose={() => setIsAuthorModalOpen(false)}
+        version={APP_VERSION}
       />
       
       {/* AddTaskModal should be on top, hence zIndex="z-[60]" and placed last */}

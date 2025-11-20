@@ -1,14 +1,15 @@
 
 import React from 'react';
 import { Modal } from './ui/Modal';
-import { Sparkles, Mail, MessageCircle } from 'lucide-react';
+import { Sparkles, Mail, MessageCircle, Tag } from 'lucide-react';
 
 interface AuthorModalProps {
   isOpen: boolean;
   onClose: () => void;
+  version?: string;
 }
 
-export const AuthorModal: React.FC<AuthorModalProps> = ({ isOpen, onClose }) => {
+export const AuthorModal: React.FC<AuthorModalProps> = ({ isOpen, onClose, version }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="关于作品" className="max-w-md">
       <div className="flex flex-col items-center text-center space-y-6 py-4">
@@ -22,8 +23,14 @@ export const AuthorModal: React.FC<AuthorModalProps> = ({ isOpen, onClose }) => 
         </div>
 
         <div className="space-y-2">
-            <h3 className="text-2xl font-bold text-white tracking-tight">代办清单系统</h3>
+            <h3 className="text-2xl font-bold text-white tracking-tight">四象限代办清单</h3>
             <p className="text-sm text-gray-400">探索极简与个性化的交互边界</p>
+            {version && (
+                 <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 mt-1">
+                    <Tag size={12} className="text-gray-500" />
+                    <span className="text-xs font-mono text-gray-400">v{version}</span>
+                 </div>
+            )}
         </div>
 
         <div className="w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
