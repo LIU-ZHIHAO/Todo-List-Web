@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, CalendarDays, BarChart3, Circle, CheckCircle2, X, Download, Upload } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, CalendarDays, BarChart3, Circle, CheckCircle2, X } from 'lucide-react';
 import { Task, QuickNote, SortConfig, Tag } from '../types';
 import { TaskCard } from './TaskCard';
 import { Modal } from './ui/Modal';
@@ -52,13 +52,27 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
   const [popupViewDate, setPopupViewDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const applySystemSort = (list: Task[]) => {
     return [...list].sort((a, b) => {
+      // Always put completed tasks after incomplete tasks
       if (a.completed && !b.completed) return 1;
       if (!a.completed && b.completed) return -1;
-      return b.createdAt - a.createdAt;
+
+      // Apply sorting based on sortConfig
+      if (sortConfig.mode === 'custom') {
+        // Sort by order field
+        return (a.order || 0) - (b.order || 0);
+      } else if (sortConfig.mode === 'created') {
+        // Sort by creation time
+        const diff = a.createdAt - b.createdAt;
+        return sortConfig.direction === 'asc' ? diff : -diff;
+      } else if (sortConfig.mode === 'progress') {
+        // Sort by progress
+        const diff = a.progress - b.progress;
+        return sortConfig.direction === 'asc' ? diff : -diff;
+      }
+      return 0;
     });
   };
 
@@ -146,55 +160,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
     };
   }, [tasks, dateFilter, filterDate]);
 
-  const handleExport = () => {
-    const exportData = {
-      version: 2,
-      exportDate: new Date().toISOString(),
-      tasks: tasks,
-      quickNotes: quickNotes
-    };
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `eisenhower-backup-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const content = event.target?.result as string;
-        const data = JSON.parse(content);
-        let tasksToImport: Task[] = [];
-        let notesToImport: QuickNote[] = [];
-        if (Array.isArray(data)) {
-          tasksToImport = data;
-        } else if (data.tasks || data.quickNotes) {
-          tasksToImport = data.tasks || [];
-          notesToImport = data.quickNotes || [];
-        } else {
-          throw new Error("Invalid format");
-        }
-        if (window.confirm(`确认导入 ${tasksToImport.length} 个任务和 ${notesToImport.length} 条闪念吗？`)) {
-          onImport?.(tasksToImport, notesToImport);
-          alert('导入成功！');
-        }
-      } catch (error) {
-        console.error(error);
-        alert('文件格式错误。');
-      }
-    };
-    reader.readAsText(file);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -517,20 +483,6 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
               ))}
             </div>
 
-            {/* Export/Import */}
-            <div className="flex items-center gap-2 ml-auto">
-              <button
-                onClick={handleExport}
-                className="p-2 rounded-lg bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
-                title="导出数据"
-              >
-                <Download size={18} />
-              </button>
-              <label className="p-2 rounded-lg bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-300 transition-colors cursor-pointer" title="导入数据">
-                <Upload size={18} />
-                <input type="file" accept=".json" className="hidden" onChange={handleFileChange} ref={fileInputRef} />
-              </label>
-            </div>
           </div>
         )}
       </div>
