@@ -203,6 +203,7 @@ export const TaskCard = React.memo<TaskCardProps>(({
 
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                         <button
+                            data-testid="toggle-complete"
                             onClick={toggleComplete}
                             className={`transition-all duration-300 flex-shrink-0 ${task.completed ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:text-gray-400 dark:hover:text-gray-300'}`}
                         >
