@@ -429,10 +429,13 @@ export default function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         config={sortConfig}
-        onUpdate={(newConfig) => setSortConfig(newConfig)}
+        onUpdate={setSortConfig}
         streamConfig={streamConfig}
-        onUpdateStream={(newConfig) => setStreamConfig(newConfig)}
+        onUpdateStream={setStreamConfig}
         onClearData={handleClearData}
+        tasks={tasks}
+        quickNotes={quickNotes}
+        onImport={handleImportData}
       />
 
       <HelpModal
