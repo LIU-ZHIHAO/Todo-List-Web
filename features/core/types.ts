@@ -1,17 +1,20 @@
 export enum Quadrant {
-  Q1 = 'Q1', // Urgent & Important
-  Q2 = 'Q2', // Not Urgent & Important
-  Q3 = 'Q3', // Urgent & Not Important
-  Q4 = 'Q4', // Not Urgent & Not Important
+  Q1 = 'Q1',
+  Q2 = 'Q2',
+  Q3 = 'Q3',
+  Q4 = 'Q4',
 }
 
 export enum Tag {
-  STUDY = '学习',
-  LIFE = '生活',
-  WORK = '工作',
-  ENTERTAINMENT = '娱乐',
-  HEALTH = '健康',
-  SOCIAL = '社交',
+  Work = '工作',
+  Personal = '生活',
+  Study = '学习',
+  Health = '健康',
+  Finance = '财务',
+  Home = '家庭',
+  Social = '社交',
+  Travel = '旅行',
+  Hobby = '爱好',
 }
 
 export interface Subtask {
@@ -40,6 +43,11 @@ export interface QuickNote {
   id: string;
   content: string;
   createdAt: number;
+  tags?: string[];
+  linkedTaskId?: string;
+  isStarred?: boolean;
+  color?: string;
+  attachments?: string[];
 }
 
 export type SortMode = 'custom' | 'created' | 'progress';

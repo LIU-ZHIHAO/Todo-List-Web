@@ -1,8 +1,10 @@
 
-import React, { useState, useRef } from 'react';
-import { Modal } from './ui/Modal';
-import { SortConfig, SortMode, SortDirection, StreamConfig, StreamMode, StreamSpeed, Task, QuickNote } from '../types';
-import { GripVertical, Calendar, Percent, ArrowUpNarrowWide, ArrowDownNarrowWide, PauseCircle, PlayCircle, EyeOff, AlertTriangle, Trash2, RefreshCw, Gauge, Download, Upload, Database } from 'lucide-react';
+
+import React, { useState, useRef, useEffect } from 'react';
+import { Modal } from '../../shared/components/ui/Modal';
+import { SortConfig, SortMode, SortDirection, StreamConfig, StreamMode, StreamSpeed, Task, QuickNote } from '../../core/types';
+import { GripVertical, Calendar, Percent, ArrowUpNarrowWide, ArrowDownNarrowWide, PauseCircle, PlayCircle, EyeOff, AlertTriangle, Trash2, RefreshCw, Gauge, Download, Upload, Database, Cloud, CloudOff, CheckCircle } from 'lucide-react';
+import { migrateAllData, syncFromSupabase, checkSupabaseConnection, getSupabaseStats } from '../../core/utils/migration';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -20,6 +22,24 @@ interface SettingsModalProps {
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, config, onUpdate, streamConfig, onUpdateStream, onClearData, tasks, quickNotes, onImport }) => {
     const [confirmDanger, setConfirmDanger] = useState<{ type: 'tasks' | 'notes' | 'all', step: number } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Supabase 同步状态
+    const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
+    const [isMigrating, setIsMigrating] = useState(false);
+    const [migrationStatus, setMigrationStatus] = useState<string>('');
+    const [supabaseStats, setSupabaseStats] = useState<{ tasksCount: number; notesCount: number } | null>(null);
+
+    // 检查 Supabase 连接状态
+    useEffect(() => {
+        if (isOpen) {
+            checkSupabaseConnection().then(setIsSupabaseConnected);
+            getSupabaseStats().then(stats => {
+                if (!stats.error) {
+                    setSupabaseStats(stats);
+                }
+            });
+        }
+    }, [isOpen]);
 
     const handleModeChange = (mode: SortMode) => {
         onUpdate({ ...config, mode });
@@ -97,6 +117,60 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
         reader.readAsText(file);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
+        }
+    };
+
+    // 上传到 Supabase
+    const handleUploadToSupabase = async () => {
+        setIsMigrating(true);
+        setMigrationStatus('正在上传数据到 Supabase...');
+
+        try {
+            const result = await migrateAllData();
+
+            if (result.success) {
+                setMigrationStatus(`✅ 成功上传 ${result.tasksCount} 个任务和 ${result.notesCount} 条闪念`);
+                // 刷新统计
+                const stats = await getSupabaseStats();
+                if (!stats.error) {
+                    setSupabaseStats(stats);
+                }
+                setTimeout(() => setMigrationStatus(''), 3000);
+            } else {
+                setMigrationStatus(`❌ 上传失败: ${result.errors.join(', ')}`);
+            }
+        } catch (e) {
+            setMigrationStatus(`❌ 上传异常: ${e instanceof Error ? e.message : String(e)}`);
+        } finally {
+            setIsMigrating(false);
+        }
+    };
+
+    // 从 Supabase 下载
+    const handleDownloadFromSupabase = async () => {
+        if (!window.confirm('这将用 Supabase 中的数据替换本地所有数据,确认继续吗?')) {
+            return;
+        }
+
+        setIsMigrating(true);
+        setMigrationStatus('正在从 Supabase 下载数据...');
+
+        try {
+            const result = await syncFromSupabase();
+
+            if (result.success) {
+                setMigrationStatus(`✅ 成功下载 ${result.tasksCount} 个任务和 ${result.notesCount} 条闪念`);
+                setTimeout(() => {
+                    setMigrationStatus('');
+                    window.location.reload(); // 刷新页面以加载新数据
+                }, 2000);
+            } else {
+                setMigrationStatus(`❌ 下载失败: ${result.errors.join(', ')}`);
+            }
+        } catch (e) {
+            setMigrationStatus(`❌ 下载异常: ${e instanceof Error ? e.message : String(e)}`);
+        } finally {
+            setIsMigrating(false);
         }
     };
 
@@ -249,6 +323,94 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                             </div>
                             <input type="file" accept=".json" className="hidden" onChange={handleFileChange} ref={fileInputRef} />
                         </label>
+                    </div>
+
+                    {/* Supabase 云端同步 */}
+                    <div className="mt-6 pt-6 border-t border-slate-200 dark:border-white/10">
+                        <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-xs font-bold text-sky-400 dark:text-sky-500/80 uppercase tracking-widest flex items-center gap-2">
+                                <div className="w-1 h-1 rounded-full bg-sky-500"></div>
+                                云端同步
+                            </h4>
+                            <div className="flex items-center gap-2">
+                                {isSupabaseConnected ? (
+                                    <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                                        <Cloud size={14} />
+                                        <span>已连接</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-1 text-xs text-slate-400">
+                                        <CloudOff size={14} />
+                                        <span>未连接</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {supabaseStats && (
+                            <div className="mb-3 p-3 bg-slate-50 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10">
+                                <div className="text-xs text-slate-600 dark:text-gray-400 space-y-1">
+                                    <div className="flex justify-between">
+                                        <span>云端任务:</span>
+                                        <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{supabaseStats.tasksCount}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>云端闪念:</span>
+                                        <span className="font-mono font-bold text-purple-600 dark:text-purple-400">{supabaseStats.notesCount}</span>
+                                    </div>
+                                    <div className="flex justify-between pt-1 border-t border-slate-200 dark:border-white/10">
+                                        <span>本地任务:</span>
+                                        <span className="font-mono font-bold text-slate-700 dark:text-gray-200">{tasks.length}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>本地闪念:</span>
+                                        <span className="font-mono font-bold text-slate-700 dark:text-gray-200">{quickNotes.length}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-3">
+                            {/* 上传到云端 */}
+                            <button
+                                onClick={handleUploadToSupabase}
+                                disabled={!isSupabaseConnected || isMigrating}
+                                className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-slate-200 dark:border-white/10 hover:border-sky-400 dark:hover:border-sky-500 hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-all group bg-white dark:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Cloud size={24} className="text-sky-600 dark:text-sky-400" />
+                                <div className="text-center">
+                                    <div className="text-sm font-bold text-slate-700 dark:text-gray-200">上传到云端</div>
+                                    <div className="text-xs text-slate-500 dark:text-gray-400">同步到 Supabase</div>
+                                </div>
+                            </button>
+
+                            {/* 从云端下载 */}
+                            <button
+                                onClick={handleDownloadFromSupabase}
+                                disabled={!isSupabaseConnected || isMigrating}
+                                className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-slate-200 dark:border-white/10 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all group bg-white dark:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Download size={24} className="text-indigo-600 dark:text-indigo-400" />
+                                <div className="text-center">
+                                    <div className="text-sm font-bold text-slate-700 dark:text-gray-200">从云端下载</div>
+                                    <div className="text-xs text-slate-500 dark:text-gray-400">替换本地数据</div>
+                                </div>
+                            </button>
+                        </div>
+
+                        {/* 同步状态提示 */}
+                        {migrationStatus && (
+                            <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-500/30 rounded-lg animate-in fade-in slide-in-from-top-2">
+                                <div className="flex items-start gap-2">
+                                    {isMigrating ? (
+                                        <RefreshCw size={16} className="text-blue-600 dark:text-blue-400 animate-spin mt-0.5" />
+                                    ) : (
+                                        <CheckCircle size={16} className="text-blue-600 dark:text-blue-400 mt-0.5" />
+                                    )}
+                                    <p className="text-xs text-blue-700 dark:text-blue-300 flex-1">{migrationStatus}</p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 

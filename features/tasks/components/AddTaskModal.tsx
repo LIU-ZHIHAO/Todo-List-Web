@@ -1,28 +1,30 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { AlignLeft, ListTodo, CheckSquare, Trash2, Plus, Calendar as CalendarIcon, Tag as TagIcon, LayoutGrid, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Task, Quadrant, Tag, Subtask } from '../types';
-import { TAG_COLORS, TAG_BORDER_COLORS, QUADRANT_INFO } from '../constants/theme';
-import { Modal } from './ui/Modal';
-import { getLunarDate } from '../utils/lunar';
-import { generateId } from '../utils/helpers';
+import React, { useState, useEffect, useRef } from 'react';
+import { Calendar as CalendarIcon, Tag as TagIcon, LayoutGrid, CheckSquare, ChevronLeft, ChevronRight, AlignLeft, ListTodo, Plus, Trash2, X } from 'lucide-react';
+import { Task, Quadrant, Subtask, Tag } from '../../core/types';
+import { generateId } from '../../core/utils/helpers';
+import { getLunarDate } from '../../core/utils/lunar';
+import { TAG_COLORS, TAG_BORDER_COLORS, QUADRANT_INFO } from '../../core/constants/theme';
+import { Modal } from '../../shared/components/ui/Modal';
 
 interface AddTaskModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (task: Task, isEditing: boolean) => void;
+    onSave: (task: Task, isEdit: boolean) => void;
     initialTask?: Task | null;
     initialQuadrant?: Quadrant | null;
+    initialContent?: string;
     zIndex?: string;
 }
 
-export const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onSave, initialTask, initialQuadrant, zIndex = 'z-50' }) => {
-    const [title, setTitle] = useState('');
-    const [description, setDescription] = useState('');
-    const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+export const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onSave, initialTask, initialQuadrant, initialContent, zIndex = 'z-50' }) => {
+    const [title, setTitle] = useState(initialTask?.title || '');
+    const [description, setDescription] = useState(initialTask?.description || '');
+    const [subtasks, setSubtasks] = useState<Subtask[]>(initialTask?.subtasks || []);
+    const [date, setDate] = useState(initialTask?.date || new Date().toISOString().split('T')[0]);
+    const [tag, setTag] = useState<Tag>(initialTask?.tag || Tag.Work);
+    const [quadrant, setQuadrant] = useState<Quadrant>(initialTask?.quadrant || initialQuadrant || Quadrant.Q2);
+
     const [newSubtaskInput, setNewSubtaskInput] = useState('');
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-    const [tag, setTag] = useState<Tag>(Tag.WORK);
-    const [quadrant, setQuadrant] = useState<Quadrant>(Quadrant.Q2);
     const [isSelectingDate, setIsSelectingDate] = useState(false);
     const [viewDate, setViewDate] = useState(new Date());
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -37,21 +39,20 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onS
                 setTag(initialTask.tag);
                 setQuadrant(initialTask.quadrant);
             } else {
-                setTitle('');
+                setTitle(initialContent || '');
                 setDescription('');
                 setSubtasks([]);
                 setDate(new Date().toISOString().split('T')[0]);
-                setTag(Tag.WORK);
+                setTag(Tag.Work);
                 setQuadrant(initialQuadrant || Quadrant.Q2);
             }
-            setNewSubtaskInput('');
             setIsSelectingDate(false);
         }
-    }, [isOpen, initialTask, initialQuadrant]);
+    }, [isOpen, initialTask, initialQuadrant, initialContent]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!title || !quadrant) return;
+        if (!title.trim()) return;
 
         const task: Task = {
             id: initialTask ? initialTask.id : generateId(),
@@ -220,12 +221,12 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onS
                                     type="button"
                                     onClick={() => setTag(t)}
                                     className={`
-                                                py-2 rounded-lg text-xs font-bold transition-all duration-200
-                                                ${isSelected
+                                                    py-2 rounded-lg text-xs font-bold transition-all duration-200
+                                                    ${isSelected
                                             ? `${activeClass} text-white scale-105 ring-1 ring-white/20`
                                             : `bg-transparent border ${inactiveClass} opacity-60 hover:opacity-100 hover:scale-105`
                                         }
-                                            `}
+                                                `}
                                 >
                                     {t}
                                 </button>
@@ -249,11 +250,11 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onS
                                     type="button"
                                     onClick={() => setQuadrant(q)}
                                     className={`relative p-4 rounded-2xl border text-left transition-all duration-300 group flex flex-col justify-between h-28
-                                                ${isSelected
+                                                    ${isSelected
                                             ? `${baseStyle} ring-2 ring-offset-2 ring-offset-white dark:ring-offset-[#1a1f35] ring-${info.color.split('-')[1]}-500 opacity-100 shadow-md scale-[1.02]`
                                             : `${baseStyle} opacity-60 hover:opacity-100 hover:scale-[1.02] hover:shadow-sm`
                                         }
-                                            `}
+                                                `}
                                 >
                                     <div className="flex items-start justify-between w-full">
                                         <div className={`w-2.5 h-2.5 rounded-full ${info.dotColor} shadow-[0_0_8px_currentColor]`} />
@@ -308,23 +309,23 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onS
                                     type="button"
                                     onClick={() => handleDateSelect(day)}
                                     className={`aspect-[4/5] rounded-xl transition-all flex flex-col items-center justify-center relative overflow-hidden
-                                                ${isSelected
+                                                    ${isSelected
                                             ? 'bg-blue-600 text-white shadow-lg scale-105 z-10'
                                             : isToday
                                                 ? 'bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30'
                                                 : 'hover:bg-slate-100 dark:hover:bg-white/10'
                                         }
-                                            `}
+                                                `}
                                 >
                                     <span className={`text-base font-medium ${isToday && !isSelected ? 'text-blue-600 dark:text-blue-400' : isSelected ? 'text-white' : 'text-slate-600 dark:text-gray-300'}`}>{day}</span>
                                     <span className={`text-[10px] mt-0.5 transform scale-90 origin-center
-                                                ${lunarInfo.festival
+                                                    ${lunarInfo.festival
                                             ? (isSelected ? 'text-white font-bold' : 'text-red-500 dark:text-red-400 font-medium')
                                             : lunarInfo.term
                                                 ? (isSelected ? 'text-blue-100' : 'text-emerald-600 dark:text-emerald-400')
                                                 : 'text-slate-400 dark:text-gray-500'
                                         }
-                                            `}>
+                                                `}>
                                         {lunarInfo.festival || lunarInfo.term || lunarInfo.lunar}
                                     </span>
                                     {isToday && !isSelected && <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-blue-400 rounded-full"></div>}

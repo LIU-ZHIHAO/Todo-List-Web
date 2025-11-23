@@ -1,5 +1,8 @@
 
 import { Task, QuickNote } from '../types';
+import { supabase } from './supabase';
+
+const isOnline = () => typeof navigator !== 'undefined' && navigator.onLine;
 
 const DB_NAME = 'EisenhowerDB';
 const DB_VERSION = 6; // Bumped for potential schema updates if needed, though logic handles existing
@@ -15,7 +18,7 @@ export class DBService {
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
-        
+
         // Create tasks store if not exists
         if (!db.objectStoreNames.contains(STORE_TASKS)) {
           const store = db.createObjectStore(STORE_TASKS, { keyPath: 'id' });
@@ -23,11 +26,11 @@ export class DBService {
           store.createIndex('quadrant', 'quadrant', { unique: false });
           store.createIndex('order', 'order', { unique: false });
         } else {
-           // If updating existing store in future
-           const store = (event.target as IDBOpenDBRequest).transaction?.objectStore(STORE_TASKS);
-           if (store && !store.indexNames.contains('order')) {
-             store.createIndex('order', 'order', { unique: false });
-           }
+          // If updating existing store in future
+          const store = (event.target as IDBOpenDBRequest).transaction?.objectStore(STORE_TASKS);
+          if (store && !store.indexNames.contains('order')) {
+            store.createIndex('order', 'order', { unique: false });
+          }
         }
 
         // Create quick_notes store if not exists
@@ -97,12 +100,12 @@ export class DBService {
   }
 
   async getActiveTasks(): Promise<Task[]> {
-     return this.getInitialTasks();
+    return this.getInitialTasks();
   }
 
   async addTask(task: Task): Promise<void> {
     const db = await this.dbPromise;
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const transaction = db.transaction(STORE_TASKS, 'readwrite');
       const store = transaction.objectStore(STORE_TASKS);
       const request = store.add(task);
@@ -110,6 +113,12 @@ export class DBService {
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
+
+    if (isOnline()) {
+      supabase.from('tasks').upsert(task).then(({ error }) => {
+        if (error) console.error('Supabase addTask error:', error);
+      });
+    }
   }
 
   async bulkAddTasks(tasks: Task[]): Promise<void> {
@@ -128,7 +137,7 @@ export class DBService {
 
   async updateTask(task: Task): Promise<void> {
     const db = await this.dbPromise;
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const transaction = db.transaction(STORE_TASKS, 'readwrite');
       const store = transaction.objectStore(STORE_TASKS);
       const request = store.put(task);
@@ -136,11 +145,17 @@ export class DBService {
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
+
+    if (isOnline()) {
+      supabase.from('tasks').upsert(task).then(({ error }) => {
+        if (error) console.error('Supabase updateTask error:', error);
+      });
+    }
   }
 
   async deleteTask(id: string): Promise<void> {
     const db = await this.dbPromise;
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const transaction = db.transaction(STORE_TASKS, 'readwrite');
       const store = transaction.objectStore(STORE_TASKS);
       const request = store.delete(id);
@@ -148,6 +163,12 @@ export class DBService {
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
+
+    if (isOnline()) {
+      supabase.from('tasks').delete().eq('id', id).then(({ error }) => {
+        if (error) console.error('Supabase deleteTask error:', error);
+      });
+    }
   }
 
   async clearTasks(): Promise<void> {
@@ -169,7 +190,7 @@ export class DBService {
     return new Promise((resolve, reject) => {
       if (!db.objectStoreNames.contains(STORE_NOTES)) {
         console.warn('Quick Notes store not found, returning empty.');
-        resolve([]); 
+        resolve([]);
         return;
       }
       const transaction = db.transaction(STORE_NOTES, 'readonly');
@@ -183,10 +204,10 @@ export class DBService {
 
   async addQuickNote(note: QuickNote): Promise<void> {
     const db = await this.dbPromise;
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       if (!db.objectStoreNames.contains(STORE_NOTES)) {
-         reject(new Error("Quick Notes store does not exist."));
-         return;
+        reject(new Error("Quick Notes store does not exist."));
+        return;
       }
       const transaction = db.transaction(STORE_NOTES, 'readwrite');
       const store = transaction.objectStore(STORE_NOTES);
@@ -195,6 +216,34 @@ export class DBService {
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
+
+    if (isOnline()) {
+      supabase.from('quick_notes').upsert(note).then(({ error }) => {
+        if (error) console.error('Supabase addQuickNote error:', error);
+      });
+    }
+  }
+
+  async updateQuickNote(note: QuickNote): Promise<void> {
+    const db = await this.dbPromise;
+    await new Promise<void>((resolve, reject) => {
+      if (!db.objectStoreNames.contains(STORE_NOTES)) {
+        reject(new Error("Quick Notes store does not exist."));
+        return;
+      }
+      const transaction = db.transaction(STORE_NOTES, 'readwrite');
+      const store = transaction.objectStore(STORE_NOTES);
+      const request = store.put(note);
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+
+    if (isOnline()) {
+      supabase.from('quick_notes').upsert(note).then(({ error }) => {
+        if (error) console.error('Supabase updateQuickNote error:', error);
+      });
+    }
   }
 
   async bulkAddQuickNotes(notes: QuickNote[]): Promise<void> {
@@ -214,10 +263,10 @@ export class DBService {
       notes.forEach(note => store.add(note));
     });
   }
-  
+
   async deleteQuickNote(id: string): Promise<void> {
     const db = await this.dbPromise;
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const transaction = db.transaction(STORE_NOTES, 'readwrite');
       const store = transaction.objectStore(STORE_NOTES);
       const request = store.delete(id);
@@ -225,6 +274,12 @@ export class DBService {
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
+
+    if (isOnline()) {
+      supabase.from('quick_notes').delete().eq('id', id).then(({ error }) => {
+        if (error) console.error('Supabase deleteQuickNote error:', error);
+      });
+    }
   }
 
   async clearQuickNotes(): Promise<void> {
@@ -244,12 +299,12 @@ export class DBService {
   }
 
   async resetDatabase(): Promise<void> {
-      try {
-          await this.clearTasks();
-          await this.clearQuickNotes();
-      } catch (e) {
-          throw e;
-      }
+    try {
+      await this.clearTasks();
+      await this.clearQuickNotes();
+    } catch (e) {
+      throw e;
+    }
   }
 }
 

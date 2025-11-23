@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, CheckCircle2, Circle, ChevronDown, ChevronUp, Plus } from 'lucide-react';
-import { Task, Subtask } from '../types';
-import { TAG_COLORS } from '../constants/theme';
+import { CheckCircle2, Circle, ChevronDown, ChevronUp, Trash2, Plus } from 'lucide-react';
+import { Task, Subtask } from '../../core/types';
+import { TAG_COLORS } from '../../core/constants/theme';
+import { generateId } from '../../core/utils/helpers';
 
 interface TaskCardProps {
     task: Task;
@@ -15,9 +16,7 @@ interface TaskCardProps {
     variant?: 'default' | 'history';
 }
 
-const generateId = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
-
-export const TaskCard = React.memo<TaskCardProps>(({
+export const TaskCard: React.FC<TaskCardProps> = React.memo(({
     task, onUpdate, onDelete, onEdit, noStrikethrough = false,
     draggable, onDragStart, onDrop, variant = 'default'
 }) => {

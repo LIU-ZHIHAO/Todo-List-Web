@@ -1,7 +1,7 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
-import { Task, Quadrant } from '../types';
-import { QUADRANT_INFO } from '../constants/theme';
+import { Task, Quadrant } from '../../core/types';
+import { QUADRANT_INFO } from '../../core/constants/theme';
 import { TaskCard } from './TaskCard';
 
 interface QuadrantSectionProps {

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Task, QuickNote, Quadrant } from '../types';
-import { dbService } from '../services/db';
-import { generateId, checkIsOverdue } from '../utils/helpers';
+import { Task, QuickNote, Quadrant } from '../../core/types';
+import { dbService } from '../../core/services/db';
+import { generateId, checkIsOverdue } from '../../core/utils/helpers';
 
 export const useTasks = () => {
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -229,6 +229,11 @@ export const useTasks = () => {
         setQuickNotes(prev => prev.filter(n => n.id !== id));
     }, [withSaveStatus]);
 
+    const handleUpdateQuickNote = useCallback(async (updatedNote: QuickNote) => {
+        await withSaveStatus(dbService.updateQuickNote(updatedNote));
+        setQuickNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
+    }, [withSaveStatus]);
+
     return {
         tasks,
         setTasks,
@@ -244,6 +249,7 @@ export const useTasks = () => {
         handleImportData,
         handleClearData,
         handleAddQuickNote,
-        handleDeleteQuickNote
+        handleDeleteQuickNote,
+        handleUpdateQuickNote
     };
 };

@@ -1,38 +1,48 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { Plus, History as HistoryIcon, CheckCircle2, LayoutGrid, Info, Settings, Sun, Moon, HelpCircle } from 'lucide-react';
-import { Task, Quadrant, SortConfig, StreamConfig, QuickNote, Tag } from './types';
-import { TAG_COLORS, TAG_BORDER_COLORS, QUADRANT_INFO } from './constants/theme';
-import { DEMO_QUOTES } from './constants/data';
-import { generateId, checkIsOverdue } from './utils/helpers';
-import { AddTaskModal } from './components/AddTaskModal';
-import { TaskCard } from './components/TaskCard';
-import { HistoryModal } from './components/HistoryModal';
-import { SettingsModal } from './components/SettingsModal';
-import { HelpModal } from './components/HelpModal';
-import { AuthorModal } from './components/AuthorModal';
-import { InputArea } from './components/InputArea';
-import { SideStream } from './components/SideStream';
-import { QuadrantSection } from './components/QuadrantSection';
-import { ScrollingItem } from './components/ScrollingItem';
-import { useTasks } from './hooks/useTasks';
-import { useDragDrop } from './hooks/useDragDrop';
+import React, { useEffect, useMemo } from 'react';
+import { Plus, History as HistoryIcon, LayoutGrid, Info, Settings, Sun, Moon, HelpCircle, WifiOff, Library } from 'lucide-react';
+import { Quadrant, QuickNote, Task } from './features/core/types';
+import { DEMO_QUOTES } from './features/core/constants/data';
+import { AddTaskModal } from './features/tasks/components/AddTaskModal';
+import { HistoryModal } from './features/history/components/HistoryModal';
+import { SettingsModal } from './features/settings/components/SettingsModal';
+import { HelpModal } from './features/settings/components/HelpModal';
+import { AuthorModal } from './features/settings/components/AuthorModal';
+import { QuickNoteModal } from './features/quicknotes/components/QuickNoteModal';
+import { InputArea } from './features/quicknotes/components/InputArea';
+import { SideStream } from './features/quicknotes/components/SideStream';
+import { QuadrantSection } from './features/tasks/components/QuadrantSection';
+import { ScrollingItem } from './features/quicknotes/components/ScrollingItem';
+import { useDragDrop } from './features/tasks/hooks/useDragDrop';
+import { useOnlineStatus } from './features/shared/hooks/useOnlineStatus';
+import { useKeyboardShortcuts } from './features/shared/hooks/useKeyboardShortcuts';
+import { Providers } from './features/core/context/Providers';
+import { useSettings } from './features/core/context/SettingsContext';
+import { useUI } from './features/core/context/UIContext';
+import { useTaskContext } from './features/core/context/TaskContext';
+import { ErrorBoundary } from './features/core/components/ErrorBoundary';
 
 const APP_VERSION = '1.2.0';
 
-export default function App() {
-  // Theme State
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('theme') as 'dark' | 'light' || 'dark';
-    }
-    return 'dark';
-  });
+const MainLayout = () => {
+  const {
+    theme, toggleTheme,
+    isTaskModalOpen, openTaskModal, closeTaskModal,
+    isHistoryOpen, setIsHistoryOpen,
+    isAuthorModalOpen, setIsAuthorModalOpen,
+    isSettingsOpen, setIsSettingsOpen,
+    isHelpOpen, setIsHelpOpen,
+    isQuickNoteModalOpen, setIsQuickNoteModalOpen,
+    editingTask, initialQuadrant, initialContent,
+    convertingNoteId, setConvertingNoteId,
+    closeAllModals
+  } = useUI();
+
+  const { sortConfig, setSortConfig, streamConfig, setStreamConfig } = useSettings();
 
   const {
     tasks,
     quickNotes,
     loading,
-    saveStatus,
     fetchInitialData,
     loadFullHistory,
     handleSaveTask,
@@ -41,80 +51,65 @@ export default function App() {
     handleImportData,
     handleClearData,
     handleAddQuickNote,
-    handleDeleteQuickNote
-  } = useTasks();
+    handleDeleteQuickNote,
+    handleUpdateQuickNote
+  } = useTaskContext();
 
-  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [initialQuadrant, setInitialQuadrant] = useState<Quadrant | null>(null);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isAuthorModalOpen, setIsAuthorModalOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-
-  // Sorting Config State
-  const [sortConfig, setSortConfig] = useState<SortConfig>(() => {
-    const saved = localStorage.getItem('sortConfig');
-    return saved ? JSON.parse(saved) : { mode: 'custom', direction: 'asc' };
-  });
-
-  // Stream Config State
-  const [streamConfig, setStreamConfig] = useState<StreamConfig>(() => {
-    const saved = localStorage.getItem('streamConfig');
-    try {
-      const parsed = saved ? JSON.parse(saved) : null;
-      if (parsed && typeof parsed.speed === 'string') {
-        return { mode: parsed.mode, speed: 50 };
-      }
-      return parsed || { mode: 'scroll', speed: 50 };
-    } catch (e) {
-      return { mode: 'scroll', speed: 50 };
-    }
-  });
-
-  // Apply Theme Class
-  useEffect(() => {
-    const root = window.document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme((prev: 'dark' | 'light') => prev === 'dark' ? 'light' : 'dark');
-  };
+  const isOnline = useOnlineStatus();
 
   useEffect(() => {
     fetchInitialData();
   }, [fetchInitialData]);
 
-  // Persist Configs
-  useEffect(() => {
-    localStorage.setItem('sortConfig', JSON.stringify(sortConfig));
-  }, [sortConfig]);
-
-  useEffect(() => {
-    localStorage.setItem('streamConfig', JSON.stringify(streamConfig));
-  }, [streamConfig]);
+  // Keyboard Shortcuts
+  useKeyboardShortcuts([
+    {
+      key: 'n',
+      ctrl: true,
+      shift: true,
+      action: () => {
+        const input = document.getElementById('quick-note-input');
+        if (input) input.focus();
+      }
+    },
+    {
+      key: 'n',
+      ctrl: true,
+      action: () => openTaskModal(null, Quadrant.Q2)
+    },
+    {
+      key: 'k',
+      ctrl: true,
+      action: () => setIsQuickNoteModalOpen(true)
+    },
+    {
+      key: '/',
+      ctrl: true,
+      action: () => setIsHelpOpen(true)
+    },
+    {
+      key: 'Escape',
+      action: closeAllModals
+    }
+  ]);
 
   const handleOpenHistory = () => {
     loadFullHistory();
     setIsHistoryOpen(true);
   };
 
-  const openEditModal = useCallback((task: Task) => {
-    setEditingTask(task);
-    setInitialQuadrant(null);
-    setIsTaskModalOpen(true);
-  }, []);
+  const handleConvertQuickNoteToTask = (note: QuickNote) => {
+    setConvertingNoteId(note.id);
+    openTaskModal(null, Quadrant.Q2, note.content);
+    setIsQuickNoteModalOpen(false);
+  };
 
-  const openAddModal = (quadrant?: Quadrant) => {
-    setEditingTask(null);
-    setInitialQuadrant(quadrant || null);
-    setIsTaskModalOpen(true);
+  const onSaveTaskWrapper = async (task: Task, isEdit: boolean) => {
+    await handleSaveTask(task, isEdit);
+    if (convertingNoteId) {
+      await handleDeleteQuickNote(convertingNoteId);
+      setConvertingNoteId(null);
+    }
   };
 
   // --- Sort Logic ---
@@ -151,7 +146,6 @@ export default function App() {
 
   // --- Drag & Drop Logic ---
   const {
-    draggedTaskId,
     dragOverQuadrant,
     handleDragStart,
     handleDragEnter,
@@ -208,7 +202,7 @@ export default function App() {
         <aside className={`hidden xl:block w-[12.5%] h-full overflow-hidden relative border-r border-slate-200 dark:border-white/5 bg-white/40 dark:bg-slate-900/20 flex-shrink-0 transition-colors duration-500 ${streamConfig.mode === 'hidden' ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-slate-50 dark:from-[#0f172a] to-transparent z-10 pointer-events-none transition-colors"></div>
           <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-slate-50 dark:from-[#0f172a] to-transparent z-10 pointer-events-none transition-colors"></div>
-          <SideStream items={leftStream} isRight={false} config={streamConfig} onDeleteNote={handleDeleteQuickNote} />
+          <SideStream items={leftStream} isRight={false} config={streamConfig} onDeleteNote={handleDeleteQuickNote} onUpdateNote={handleUpdateQuickNote} />
         </aside>
 
         {/* Main Content */}
@@ -230,6 +224,14 @@ export default function App() {
 
               {/* Right Header Controls */}
               <div className="absolute right-8 top-1/2 translate-y-1 flex items-center gap-3">
+
+                <button
+                  onClick={() => setIsQuickNoteModalOpen(true)}
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-slate-200/50 dark:text-gray-400 dark:hover:text-blue-300 dark:hover:bg-white/5 transition-colors"
+                  title="闪念胶囊库"
+                >
+                  <Library size={16} />
+                </button>
 
                 <button
                   onClick={toggleTheme}
@@ -255,15 +257,15 @@ export default function App() {
                   <Settings size={16} />
                 </button>
 
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/80 border border-slate-200 dark:bg-black/20 dark:border-white/5 backdrop-blur-sm shadow-sm">
-                  {saveStatus === 'saving' ? (
-                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse shadow-[0_0_5px_rgba(250,204,21,0.5)]" />
-                  ) : (
-                    <CheckCircle2 size={12} className="text-emerald-500 dark:text-emerald-400 shadow-sm dark:shadow-[0_0_5px_rgba(52,211,153,0.5)]" />
+                <div className="flex items-center gap-1.5">
+                  {!isOnline && (
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/30 backdrop-blur-sm shadow-sm animate-pulse">
+                      <WifiOff size={12} className="text-amber-500 dark:text-amber-400" />
+                      <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium tracking-wide">
+                        离线模式
+                      </span>
+                    </div>
                   )}
-                  <span className="text-[10px] text-slate-500 dark:text-gray-400 font-medium tracking-wide">
-                    {saveStatus === 'saving' ? '同步中...' : '已同步'}
-                  </span>
                 </div>
               </div>
             </header>
@@ -273,7 +275,7 @@ export default function App() {
 
               {/* Left Button - New Task */}
               <button
-                onClick={() => openAddModal()}
+                onClick={() => openTaskModal(null, Quadrant.Q2)}
                 className="flex flex-col items-center justify-center gap-2 group relative transition-transform hover:scale-110 active:scale-95"
               >
                 {/* Tooltip */}
@@ -347,48 +349,48 @@ export default function App() {
                     quadrant={Quadrant.Q2}
                     tasks={quadrants[Quadrant.Q2]}
                     dragOverQuadrant={dragOverQuadrant}
-                    onAddClick={openAddModal}
+                    onAddClick={(q) => openTaskModal(null, q)}
                     onDragEnter={handleDragEnter}
                     onDrop={handleDrop}
                     onTaskUpdate={handleTaskUpdate}
                     onTaskDelete={handleTaskDelete}
-                    onTaskEdit={openEditModal}
+                    onTaskEdit={(task) => openTaskModal(task)}
                     onDragStart={handleDragStart}
                   />
                   <QuadrantSection
                     quadrant={Quadrant.Q1}
                     tasks={quadrants[Quadrant.Q1]}
                     dragOverQuadrant={dragOverQuadrant}
-                    onAddClick={openAddModal}
+                    onAddClick={(q) => openTaskModal(null, q)}
                     onDragEnter={handleDragEnter}
                     onDrop={handleDrop}
                     onTaskUpdate={handleTaskUpdate}
                     onTaskDelete={handleTaskDelete}
-                    onTaskEdit={openEditModal}
+                    onTaskEdit={(task) => openTaskModal(task)}
                     onDragStart={handleDragStart}
                   />
                   <QuadrantSection
                     quadrant={Quadrant.Q3}
                     tasks={quadrants[Quadrant.Q3]}
                     dragOverQuadrant={dragOverQuadrant}
-                    onAddClick={openAddModal}
+                    onAddClick={(q) => openTaskModal(null, q)}
                     onDragEnter={handleDragEnter}
                     onDrop={handleDrop}
                     onTaskUpdate={handleTaskUpdate}
                     onTaskDelete={handleTaskDelete}
-                    onTaskEdit={openEditModal}
+                    onTaskEdit={(task) => openTaskModal(task)}
                     onDragStart={handleDragStart}
                   />
                   <QuadrantSection
                     quadrant={Quadrant.Q4}
                     tasks={quadrants[Quadrant.Q4]}
                     dragOverQuadrant={dragOverQuadrant}
-                    onAddClick={openAddModal}
+                    onAddClick={(q) => openTaskModal(null, q)}
                     onDragEnter={handleDragEnter}
                     onDrop={handleDrop}
                     onTaskUpdate={handleTaskUpdate}
                     onTaskDelete={handleTaskDelete}
-                    onTaskEdit={openEditModal}
+                    onTaskEdit={(task) => openTaskModal(task)}
                     onDragStart={handleDragStart}
                   />
                 </div>
@@ -401,7 +403,7 @@ export default function App() {
         <aside className={`hidden xl:block w-[12.5%] h-full overflow-hidden relative border-l border-slate-200 dark:border-white/5 bg-white/40 dark:bg-slate-900/20 flex-shrink-0 transition-colors duration-500 ${streamConfig.mode === 'hidden' ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-slate-50 dark:from-[#0f172a] to-transparent z-10 pointer-events-none transition-colors"></div>
           <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-slate-50 dark:from-[#0f172a] to-transparent z-10 pointer-events-none transition-colors"></div>
-          <SideStream items={rightStream} isRight={true} config={streamConfig} onDeleteNote={handleDeleteQuickNote} />
+          <SideStream items={rightStream} isRight={true} config={streamConfig} onDeleteNote={handleDeleteQuickNote} onUpdateNote={handleUpdateQuickNote} />
         </aside>
 
       </div>
@@ -415,8 +417,17 @@ export default function App() {
         onDelete={handleTaskDelete}
         onUpdate={handleTaskUpdate}
         onImport={handleImportData}
-        onEditTask={openEditModal}
+        onEditTask={(task) => openTaskModal(task)}
         sortConfig={sortConfig}
+      />
+
+      <QuickNoteModal
+        isOpen={isQuickNoteModalOpen}
+        onClose={() => setIsQuickNoteModalOpen(false)}
+        notes={quickNotes}
+        onDelete={handleDeleteQuickNote}
+        onUpdate={handleUpdateQuickNote}
+        onConvertToTask={handleConvertQuickNoteToTask}
       />
 
       <AuthorModal
@@ -445,13 +456,24 @@ export default function App() {
 
       <AddTaskModal
         isOpen={isTaskModalOpen}
-        onClose={() => setIsTaskModalOpen(false)}
-        onSave={handleSaveTask}
+        onClose={closeTaskModal}
+        onSave={onSaveTaskWrapper}
         initialTask={editingTask}
         initialQuadrant={initialQuadrant}
+        initialContent={initialContent}
         zIndex="z-[60]"
       />
 
     </div>
+  );
+};
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <Providers>
+        <MainLayout />
+      </Providers>
+    </ErrorBoundary>
   );
 }

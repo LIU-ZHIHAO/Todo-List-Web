@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Task, Quadrant } from '../types';
+import { Task, Quadrant } from '../../core/types';
 
 export const useDragDrop = (
     tasks: Task[],
