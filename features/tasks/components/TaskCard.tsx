@@ -196,7 +196,7 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
             )}
 
             {/* CONTENT LAYOUT */}
-            <div className={`flex ${variant === 'history' ? 'flex-col gap-2 p-3 h-auto' : 'items-center p-2.5 gap-3 h-12'}`}>
+            <div className={`flex ${variant === 'history' ? 'flex-col gap-2 p-3 h-auto' : 'items-start p-2.5 gap-3 min-h-12'}`}>
 
                 <div className={`flex items-center ${variant === 'history' ? 'w-full justify-between' : 'flex-1 min-w-0 gap-3'}`}>
 
@@ -211,9 +211,7 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
 
                         <h3
                             onClick={() => onEdit && onEdit(task)}
-                            className={`text-sm truncate cursor-pointer select-none flex-shrink-0 
-                        ${variant === 'history' ? 'max-w-[70%]' : 'max-w-[30%] sm:max-w-[150px] md:max-w-[200px]'} 
-                        ${titleStyle}`}
+                            className={`text-sm cursor-pointer select-none whitespace-normal break-words leading-tight flex-1 min-w-0 ${titleStyle}`}
                             title={task.title}
                         >
                             {task.title}

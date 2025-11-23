@@ -1,7 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Task, QuickNote, Quadrant } from '../../core/types';
 import { dbService } from '../../core/services/db';
+import { supabaseService } from '../../core/services/supabaseService';
 import { generateId, checkIsOverdue } from '../../core/utils/helpers';
+import { useOnlineStatus } from '../../shared/hooks/useOnlineStatus';
 
 export const useTasks = () => {
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -9,6 +11,7 @@ export const useTasks = () => {
     const [loading, setLoading] = useState(true);
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
     const [hasLoadedFullHistory, setHasLoadedFullHistory] = useState(false);
+    const isOnline = useOnlineStatus();
 
     const withSaveStatus = useCallback(async (operation: Promise<void>) => {
         setSaveStatus('saving');
@@ -24,10 +27,38 @@ export const useTasks = () => {
     const fetchInitialData = useCallback(async () => {
         try {
             setLoading(true);
-            const [tasksData, notesData] = await Promise.all([
-                dbService.getInitialTasks(),
-                dbService.getAllQuickNotes()
-            ]);
+
+            // Try to load from Supabase if online
+            let tasksData: Task[] = [];
+            let notesData: QuickNote[] = [];
+            let loadedFromSupabase = false;
+
+            if (navigator.onLine) {
+                try {
+                    const [supaTasks, supaNotes] = await Promise.all([
+                        supabaseService.getAllTasks(),
+                        supabaseService.getAllQuickNotes()
+                    ]);
+                    tasksData = supaTasks;
+                    notesData = supaNotes;
+                    loadedFromSupabase = true;
+
+                    // Sync to local DB
+                    await dbService.clearTasks();
+                    await dbService.clearQuickNotes();
+                    for (const t of supaTasks) await dbService.updateTask(t);
+                    for (const n of supaNotes) await dbService.addQuickNote(n);
+                } catch (e) {
+                    console.error("Supabase load failed, falling back to local", e);
+                }
+            }
+
+            if (!loadedFromSupabase) {
+                [tasksData, notesData] = await Promise.all([
+                    dbService.getInitialTasks(),
+                    dbService.getAllQuickNotes()
+                ]);
+            }
 
             const today = new Date().toISOString().split('T')[0];
 
@@ -75,6 +106,7 @@ export const useTasks = () => {
 
                 if (modified) {
                     dbService.updateTask(newTask);
+                    if (loadedFromSupabase) supabaseService.updateTask(newTask).catch(console.error);
                 }
                 return newTask as Task;
             });
@@ -117,18 +149,27 @@ export const useTasks = () => {
             processedTask.isOverdue = false;
         }
 
-        if (isEditing) {
-            await withSaveStatus(dbService.updateTask(processedTask));
-            setTasks(prev => prev.map(t => t.id === processedTask.id ? processedTask : t));
-        } else {
-            await withSaveStatus(dbService.addTask(processedTask));
-            setTasks(prev => [processedTask, ...prev]);
-        }
+        const operation = async () => {
+            if (isEditing) {
+                await dbService.updateTask(processedTask);
+                if (navigator.onLine) await supabaseService.updateTask(processedTask);
+                setTasks(prev => prev.map(t => t.id === processedTask.id ? processedTask : t));
+            } else {
+                await dbService.addTask(processedTask);
+                if (navigator.onLine) await supabaseService.addTask(processedTask);
+                setTasks(prev => [processedTask, ...prev]);
+            }
+        };
+        await withSaveStatus(operation());
     }, [withSaveStatus]);
 
     const handleTaskDelete = useCallback(async (id: string) => {
-        await withSaveStatus(dbService.deleteTask(id));
-        setTasks(prev => prev.filter(t => t.id !== id));
+        const operation = async () => {
+            await dbService.deleteTask(id);
+            if (navigator.onLine) await supabaseService.deleteTask(id);
+            setTasks(prev => prev.filter(t => t.id !== id));
+        };
+        await withSaveStatus(operation());
     }, [withSaveStatus]);
 
     const handleTaskUpdate = useCallback(async (updatedTask: Task) => {
@@ -148,33 +189,90 @@ export const useTasks = () => {
             processedTask.completedAt = undefined;
         }
 
-        await withSaveStatus(dbService.updateTask(processedTask));
-        setTasks(prev => prev.map(t => t.id === processedTask.id ? processedTask : t));
+        const operation = async () => {
+            await dbService.updateTask(processedTask);
+            if (navigator.onLine) await supabaseService.updateTask(processedTask);
+            setTasks(prev => prev.map(t => t.id === processedTask.id ? processedTask : t));
+        };
+        await withSaveStatus(operation());
     }, [withSaveStatus]);
 
     const handleImportData = useCallback(async (importedTasks: Task[], importedNotes: QuickNote[]) => {
         setSaveStatus('saving');
         try {
+            let taskSuccess = 0;
+            let taskError = 0;
+            let noteSuccess = 0;
+            let noteError = 0;
+
             if (importedTasks && importedTasks.length > 0) {
                 for (const task of importedTasks) {
-                    if (typeof (task as any).completed === 'boolean') {
-                        if ((task as any).completed) {
-                            task.completed = task.completedAt
-                                ? new Date(task.completedAt).toISOString().split('T')[0]
-                                : new Date().toISOString().split('T')[0];
-                        } else {
-                            task.completed = null;
+                    try {
+                        // Validate and fix incomplete data
+                        const validTask = {
+                            ...task,
+                            id: task.id || generateId(),
+                            title: task.title || '未命名任务',
+                            quadrant: task.quadrant || Quadrant.Q2,
+                            date: task.date || new Date().toISOString().split('T')[0],
+                            tag: task.tag || '其他',
+                            progress: typeof task.progress === 'number' ? task.progress : 0,
+                            createdAt: task.createdAt || Date.now(),
+                            order: typeof task.order === 'number' ? task.order : (task.createdAt || Date.now())
+                        };
+
+                        // Handle completed field
+                        if (typeof (task as any).completed === 'boolean') {
+                            if ((task as any).completed) {
+                                validTask.completed = task.completedAt
+                                    ? new Date(task.completedAt).toISOString().split('T')[0]
+                                    : new Date().toISOString().split('T')[0];
+                            } else {
+                                validTask.completed = null;
+                            }
                         }
+
+                        await dbService.addTask(validTask);
+                        if (navigator.onLine) {
+                            await supabaseService.addTask(validTask).catch(e => {
+                                console.error('Failed to sync task to Supabase:', e);
+                            });
+                        }
+                        taskSuccess++;
+                    } catch (e) {
+                        console.error('Failed to import task:', task, e);
+                        taskError++;
                     }
-                    await dbService.updateTask(task);
                 }
             }
 
             if (importedNotes && importedNotes.length > 0) {
                 for (const note of importedNotes) {
                     try {
-                        await dbService.addQuickNote(note);
+                        // Validate and fix incomplete data
+                        const validNote = {
+                            ...note,
+                            id: note.id || generateId(),
+                            content: note.content || '',
+                            createdAt: note.createdAt || Date.now(),
+                            tags: Array.isArray(note.tags) ? note.tags : []
+                        };
+
+                        // Skip empty notes
+                        if (!validNote.content.trim()) {
+                            continue;
+                        }
+
+                        await dbService.addQuickNote(validNote);
+                        if (navigator.onLine) {
+                            await supabaseService.addQuickNote(validNote).catch(e => {
+                                console.error('Failed to sync note to Supabase:', e);
+                            });
+                        }
+                        noteSuccess++;
                     } catch (e) {
+                        console.error('Failed to import note:', note, e);
+                        noteError++;
                     }
                 }
             }
@@ -186,9 +284,19 @@ export const useTasks = () => {
             setHasLoadedFullHistory(true);
 
             setTimeout(() => setSaveStatus('saved'), 800);
+
+            // Show detailed feedback
+            const totalSuccess = taskSuccess + noteSuccess;
+            const totalError = taskError + noteError;
+            if (totalError > 0) {
+                alert(`导入完成！\n成功: ${totalSuccess} 条 (${taskSuccess} 待办, ${noteSuccess} 闪念)\n失败: ${totalError} 条`);
+            } else {
+                alert(`导入成功！\n共导入 ${totalSuccess} 条数据 (${taskSuccess} 待办, ${noteSuccess} 闪念)`);
+            }
         } catch (e) {
             console.error("Import failed", e);
             setSaveStatus('saved');
+            alert('导入失败，请检查文件格式');
         }
     }, []);
 
@@ -197,12 +305,30 @@ export const useTasks = () => {
         try {
             if (type === 'tasks') {
                 await dbService.clearTasks();
+                if (navigator.onLine) {
+                    const allRemote = await supabaseService.getAllTasks();
+                    await Promise.all(allRemote.map(t => supabaseService.deleteTask(t.id)));
+                }
                 setTasks([]);
             } else if (type === 'notes') {
                 await dbService.clearQuickNotes();
+                if (navigator.onLine) {
+                    const allRemote = await supabaseService.getAllQuickNotes();
+                    await Promise.all(allRemote.map(n => supabaseService.deleteQuickNote(n.id)));
+                }
                 setQuickNotes([]);
             } else if (type === 'all') {
                 await dbService.resetDatabase();
+                if (navigator.onLine) {
+                    const [allTasks, allNotes] = await Promise.all([
+                        supabaseService.getAllTasks(),
+                        supabaseService.getAllQuickNotes()
+                    ]);
+                    await Promise.all([
+                        ...allTasks.map(t => supabaseService.deleteTask(t.id)),
+                        ...allNotes.map(n => supabaseService.deleteQuickNote(n.id))
+                    ]);
+                }
                 setTasks([]);
                 setQuickNotes([]);
             }
@@ -219,19 +345,32 @@ export const useTasks = () => {
             id: generateId(),
             content: content,
             createdAt: Date.now(),
+            tags: [] // No auto-tagging
         };
-        await withSaveStatus(dbService.addQuickNote(newNote));
-        setQuickNotes(prev => [newNote, ...prev]);
+        const operation = async () => {
+            await dbService.addQuickNote(newNote);
+            if (navigator.onLine) await supabaseService.addQuickNote(newNote);
+            setQuickNotes(prev => [newNote, ...prev]);
+        };
+        await withSaveStatus(operation());
     }, [withSaveStatus]);
 
     const handleDeleteQuickNote = useCallback(async (id: string) => {
-        await withSaveStatus(dbService.deleteQuickNote(id));
-        setQuickNotes(prev => prev.filter(n => n.id !== id));
+        const operation = async () => {
+            await dbService.deleteQuickNote(id);
+            if (navigator.onLine) await supabaseService.deleteQuickNote(id);
+            setQuickNotes(prev => prev.filter(n => n.id !== id));
+        };
+        await withSaveStatus(operation());
     }, [withSaveStatus]);
 
     const handleUpdateQuickNote = useCallback(async (updatedNote: QuickNote) => {
-        await withSaveStatus(dbService.updateQuickNote(updatedNote));
-        setQuickNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
+        const operation = async () => {
+            await dbService.updateQuickNote(updatedNote);
+            if (navigator.onLine) await supabaseService.updateQuickNote(updatedNote);
+            setQuickNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
+        };
+        await withSaveStatus(operation());
     }, [withSaveStatus]);
 
     return {
