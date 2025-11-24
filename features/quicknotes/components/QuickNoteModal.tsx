@@ -26,7 +26,7 @@ export const QuickNoteModal: React.FC<QuickNoteModalProps> = ({
 
     // Extract all unique tags
     const allTags = useMemo(() => {
-        const predefinedTags = ['学业知识', '自我成长', '一闪一念', '兴趣爱好', '内容创作', 'AI领域', '生活日常', '工作搞钱', '未分类'];
+        const predefinedTags = ['学业知识', '自我成长', '一闪一念', '兴趣爱好', '内容创作', 'AI领域', '生活日常', '工作搞钱'];
         const tags = new Set<string>(predefinedTags);
         notes.forEach(note => {
             note.tags?.forEach(tag => tags.add(tag));

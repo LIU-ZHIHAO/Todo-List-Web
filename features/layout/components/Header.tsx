@@ -45,16 +45,18 @@ export const Header = () => {
                 <div className="relative md:absolute md:right-8 md:top-1/2 md:translate-y-1 flex items-center gap-2 md:gap-3">
                     {/* User Status */}
                     {!loading && user && (
-                        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 group transition-all duration-300 ease-in-out cursor-default">
                             <User size={14} className="text-blue-600 dark:text-blue-400" />
-                            <span className="text-xs text-blue-700 dark:text-blue-300 font-medium max-w-[150px] truncate">
-                                {user.email}
-                            </span>
-                            {isSuperAdmin && (
-                                <span className="text-xs bg-purple-500 text-white px-1.5 py-0.5 rounded">
-                                    管理员
+                            <div className="max-w-0 overflow-hidden group-hover:max-w-[300px] transition-all duration-500 ease-in-out flex items-center gap-2 opacity-0 group-hover:opacity-100">
+                                <span className="text-xs text-blue-700 dark:text-blue-300 font-medium whitespace-nowrap">
+                                    {user.email}
                                 </span>
-                            )}
+                                {isSuperAdmin && (
+                                    <span className="text-xs bg-purple-500 text-white px-1.5 py-0.5 rounded whitespace-nowrap">
+                                        管理员
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     )}
 

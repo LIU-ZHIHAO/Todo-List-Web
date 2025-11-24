@@ -218,7 +218,7 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
                             {task.title}
                         </h3>
 
-                        {variant === 'default' && (
+                        {(variant === 'default' || variant === 'history') && (
                             <div className="hidden md:flex flex-1 min-w-0 relative group/desc">
                                 {isEditingDesc ? (
                                     <input
@@ -250,7 +250,7 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
                                 {task.tag}
                             </span>
                         </div>
-                        {variant === 'default' && (
+                        {(variant === 'default' || variant === 'history') && (
                             <span className={`hidden sm:block text-[10px] font-mono pt-[1px] ${task.isOverdue && !task.completed ? 'text-red-500 font-bold' : 'text-slate-400 dark:text-gray-500'}`}>
                                 {task.date}
                             </span>
@@ -287,7 +287,7 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
                         )}
 
                         {variant === 'history' && (
-                            <div className="flex items-center gap-2 text-[10px] mb-1 text-slate-400 dark:text-gray-400">
+                            <div className="sm:hidden flex items-center gap-2 text-[10px] mb-1 text-slate-400 dark:text-gray-400">
                                 <span>日期: {task.date}</span>
                             </div>
                         )}
