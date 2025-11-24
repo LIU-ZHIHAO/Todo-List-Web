@@ -251,7 +251,7 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
                             </span>
                         </div>
                         {(variant === 'default' || variant === 'history') && (
-                            <span className={`hidden sm:block text-[10px] font-mono pt-[1px] ${task.isOverdue && !task.completed ? 'text-red-500 font-bold' : 'text-slate-400 dark:text-gray-500'}`}>
+                            <span className={`hidden md:block text-[10px] font-mono pt-[1px] ${task.isOverdue && !task.completed ? 'text-red-500 font-bold' : 'text-slate-400 dark:text-gray-500'}`}>
                                 {task.date}
                             </span>
                         )}
@@ -264,6 +264,11 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
                         <p className="md:hidden text-xs text-slate-500 dark:text-gray-500 line-clamp-2 flex-1">{task.description}</p>
                     )}
                     <div className="flex items-center gap-3 flex-shrink-0">
+                        {(variant === 'default' || variant === 'history') && (
+                            <span className={`md:hidden text-[10px] font-mono ${task.isOverdue && !task.completed ? 'text-red-500 font-bold' : 'text-slate-400 dark:text-gray-500'}`}>
+                                {task.date}
+                            </span>
+                        )}
                         {renderProgressBar()}
                         <button
                             onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}

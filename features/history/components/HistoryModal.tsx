@@ -289,12 +289,12 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                             </div>
                         </div>
 
-                        <div className="flex bg-slate-100/80 dark:bg-black/20 p-1 rounded-xl border border-slate-200 dark:border-white/10">
+                        <div className="flex bg-slate-100/80 dark:bg-black/20 p-1 rounded-xl border border-slate-200 dark:border-white/10 overflow-x-auto no-scrollbar">
                             {(['all', 'todo', 'done'] as StatusFilter[]).map(f => (
                                 <button
                                     key={f}
                                     onClick={() => setStatusFilter(f)}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap
+                                    className={`px-2 md:px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1 md:gap-2 whitespace-nowrap flex-shrink-0
                           ${statusFilter === f ? 'bg-white dark:bg-white/10 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 dark:text-gray-400 hover:text-black dark:hover:text-white'}
                       `}
                                 >
