@@ -350,7 +350,6 @@ export const AppLayout = () => {
                 initialContent={initialContent}
                 zIndex="z-[60]"
             />
-
         </div>
     );
 };
