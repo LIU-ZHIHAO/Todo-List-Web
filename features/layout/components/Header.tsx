@@ -70,14 +70,7 @@ export const Header = () => {
                 </button>
 
                 <div className="flex items-center gap-1.5">
-                    {!isOnline && (
-                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/30 backdrop-blur-sm shadow-sm animate-pulse">
-                            <WifiOff size={12} className="text-amber-500 dark:text-amber-400" />
-                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium tracking-wide">
-                                离线
-                            </span>
-                        </div>
-                    )}
+                    {/* Status indicator removed as per user request */}
                 </div>
             </div>
         </header>

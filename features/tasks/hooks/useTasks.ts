@@ -28,7 +28,7 @@ export const useTasks = () => {
         try {
             setLoading(true);
 
-            // Try to load from Supabase if online
+            // Always try to load from Supabase if online to ensure latest data
             let tasksData: Task[] = [];
             let notesData: QuickNote[] = [];
             let loadedFromSupabase = false;
@@ -39,20 +39,27 @@ export const useTasks = () => {
                         supabaseService.getAllTasks(),
                         supabaseService.getAllQuickNotes()
                     ]);
-                    tasksData = supaTasks;
-                    notesData = supaNotes;
-                    loadedFromSupabase = true;
 
-                    // Sync to local DB
-                    await dbService.clearTasks();
-                    await dbService.clearQuickNotes();
-                    for (const t of supaTasks) await dbService.updateTask(t);
-                    for (const n of supaNotes) await dbService.addQuickNote(n);
+                    if (supaTasks && supaNotes) {
+                        tasksData = supaTasks;
+                        notesData = supaNotes;
+                        loadedFromSupabase = true;
+
+                        // Sync to local DB immediately
+                        await dbService.clearTasks();
+                        await dbService.clearQuickNotes();
+                        // Use Promise.all for faster parallel insertion
+                        await Promise.all([
+                            ...supaTasks.map(t => dbService.updateTask(t)),
+                            ...supaNotes.map(n => dbService.addQuickNote(n))
+                        ]);
+                    }
                 } catch (e) {
                     console.error("Supabase load failed, falling back to local", e);
                 }
             }
 
+            // If offline or Supabase failed, load from local DB
             if (!loadedFromSupabase) {
                 [tasksData, notesData] = await Promise.all([
                     dbService.getInitialTasks(),
@@ -151,16 +158,19 @@ export const useTasks = () => {
 
         const operation = async () => {
             if (isEditing) {
+                // Optimistic update
+                setTasks(prev => prev.map(t => t.id === processedTask.id ? processedTask : t));
                 await dbService.updateTask(processedTask);
                 if (navigator.onLine) await supabaseService.updateTask(processedTask);
-                setTasks(prev => prev.map(t => t.id === processedTask.id ? processedTask : t));
             } else {
+                // Optimistic update
+                setTasks(prev => [processedTask, ...prev]);
                 await dbService.addTask(processedTask);
                 if (navigator.onLine) await supabaseService.addTask(processedTask);
-                setTasks(prev => [processedTask, ...prev]);
             }
         };
-        await withSaveStatus(operation());
+        // Don't await the operation for UI responsiveness, but track it for save status
+        withSaveStatus(operation());
     }, [withSaveStatus]);
 
     const handleTaskDelete = useCallback(async (id: string) => {
@@ -348,11 +358,12 @@ export const useTasks = () => {
             tags: [] // No auto-tagging
         };
         const operation = async () => {
+            // Optimistic update
+            setQuickNotes(prev => [newNote, ...prev]);
             await dbService.addQuickNote(newNote);
             if (navigator.onLine) await supabaseService.addQuickNote(newNote);
-            setQuickNotes(prev => [newNote, ...prev]);
         };
-        await withSaveStatus(operation());
+        withSaveStatus(operation());
     }, [withSaveStatus]);
 
     const handleDeleteQuickNote = useCallback(async (id: string) => {

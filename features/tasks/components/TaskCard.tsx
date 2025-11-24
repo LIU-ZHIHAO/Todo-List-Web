@@ -134,7 +134,7 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
     }
 
     const renderProgressBar = () => (
-        <div className={`${variant === 'history' ? 'w-full' : 'w-24 sm:w-32'} h-4 flex items-center gap-[2px] group/progress`} title={`当前进度: ${progress}%`}>
+        <div className={`${variant === 'history' ? 'w-full md:w-24 md:sm:w-32' : 'w-24 sm:w-32'} h-4 flex items-center gap-[2px] group/progress`} title={`当前进度: ${progress}%`}>
             {[20, 40, 60, 80, 100].map((level) => {
                 const isActive = progress >= level;
                 const isFull = level === 100;
@@ -195,10 +195,11 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
                 <div className="absolute -bottom-[2px] left-0 right-0 h-[2px] bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] rounded-full z-50" />
             )}
 
-            {/* CONTENT LAYOUT */}
-            <div className={`flex ${variant === 'history' ? 'flex-col gap-2 p-3 h-auto' : 'items-start p-2.5 gap-3 min-h-12'}`}>
+            {/* CONTENT LAYOUT - 移动端分行，Web端横向 */}
+            <div className="flex flex-col md:flex-row md:items-start p-2.5 gap-2 md:gap-3 min-h-12">
 
-                <div className={`flex items-center ${variant === 'history' ? 'w-full justify-between' : 'flex-1 min-w-0 gap-3'}`}>
+                {/* 第一行/左侧：标题、标签等主要信息 */}
+                <div className="flex items-center flex-1 min-w-0 gap-3">
 
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                         <button
@@ -218,7 +219,7 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
                         </h3>
 
                         {variant === 'default' && (
-                            <div className="flex-1 min-w-0 relative group/desc">
+                            <div className="hidden md:flex flex-1 min-w-0 relative group/desc">
                                 {isEditingDesc ? (
                                     <input
                                         autoFocus
@@ -255,39 +256,28 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
                             </span>
                         )}
                     </div>
-
-                    {variant === 'default' && (
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                            {renderProgressBar()}
-                            <button
-                                onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-                                className={`p-1 text-slate-400 hover:text-slate-700 dark:text-gray-500 dark:hover:text-white transition-all rounded hover:bg-slate-100 dark:hover:bg-white/10 ${isExpanded ? 'bg-slate-100 dark:bg-white/10 text-blue-600 dark:text-blue-400' : ''}`}
-                            >
-                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                            </button>
-                        </div>
-                    )}
                 </div>
 
-                {variant === 'history' && (
-                    <div className="w-full flex flex-col gap-2">
-                        {task.description && (
-                            <p className="text-xs text-slate-500 dark:text-gray-500 px-1 line-clamp-2">{task.description}</p>
-                        )}
-                        <div className="flex items-center justify-between gap-3 mt-1">
-                            <div className="flex-1">
-                                {renderProgressBar()}
-                            </div>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-                                className={`p-1 text-slate-400 hover:text-slate-700 dark:text-gray-500 dark:hover:text-white transition-all rounded hover:bg-slate-100 dark:hover:bg-white/10 ${isExpanded ? 'bg-slate-100 dark:bg-white/10 text-blue-600 dark:text-blue-400' : ''}`}
-                            >
-                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                            </button>
-                        </div>
+                {/* 第二行/右侧：进度条和展开按钮 - Web端在右侧，移动端在下方 */}
+                <div className="flex items-center gap-3 flex-shrink-0 md:ml-0 pl-7 md:pl-0">
+                    {variant === 'history' && task.description && (
+                        <p className="md:hidden text-xs text-slate-500 dark:text-gray-500 line-clamp-2 flex-1">{task.description}</p>
+                    )}
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                        {renderProgressBar()}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
+                            className={`p-1 text-slate-400 hover:text-slate-700 dark:text-gray-500 dark:hover:text-white transition-all rounded hover:bg-slate-100 dark:hover:bg-white/10 ${isExpanded ? 'bg-slate-100 dark:bg-white/10 text-blue-600 dark:text-blue-400' : ''}`}
+                        >
+                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
                     </div>
-                )}
+                </div>
 
+                {/* History variant 的描述在 Web 端显示 */}
+                {variant === 'history' && task.description && (
+                    <p className="hidden md:block text-xs text-slate-500 dark:text-gray-500 px-1 line-clamp-2 md:absolute md:top-full md:left-8 md:right-8 md:mt-1">{task.description}</p>
+                )}
             </div>
 
             {isExpanded && (
