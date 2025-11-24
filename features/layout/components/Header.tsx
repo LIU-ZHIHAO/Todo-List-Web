@@ -110,17 +110,7 @@ export const Header = () => {
                     </button>
 
                     {/* Auth Button */}
-                    <button
-                        onClick={handleAuthClick}
-                        disabled={loading}
-                        className={`p-1.5 rounded-lg transition-colors ${user
-                                ? 'text-red-500 hover:text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20'
-                                : 'text-green-500 hover:text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:text-green-300 dark:hover:bg-green-900/20'
-                            } disabled:opacity-50`}
-                        title={user ? "登出" : "登录"}
-                    >
-                        {user ? <LogOut size={16} /> : <LogIn size={16} />}
-                    </button>
+
 
                     <div className="flex items-center gap-1.5">
                         {/* Status indicator removed as per user request */}

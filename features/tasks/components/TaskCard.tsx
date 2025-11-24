@@ -273,11 +273,6 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
                         </button>
                     </div>
                 </div>
-
-                {/* History variant 的描述在 Web 端显示 */}
-                {variant === 'history' && task.description && (
-                    <p className="hidden md:block text-xs text-slate-500 dark:text-gray-500 px-1 line-clamp-2 md:absolute md:top-full md:left-8 md:right-8 md:mt-1">{task.description}</p>
-                )}
             </div>
 
             {isExpanded && (

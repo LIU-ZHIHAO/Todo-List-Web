@@ -102,7 +102,10 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onS
 
     const handleDateSelect = (day: number) => {
         const d = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
-        setDate(d.toISOString().split('T')[0]);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const dayStr = String(d.getDate()).padStart(2, '0');
+        setDate(`${year}-${month}-${dayStr}`);
         setIsSelectingDate(false);
     };
 

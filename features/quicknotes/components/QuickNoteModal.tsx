@@ -26,7 +26,8 @@ export const QuickNoteModal: React.FC<QuickNoteModalProps> = ({
 
     // Extract all unique tags
     const allTags = useMemo(() => {
-        const tags = new Set<string>();
+        const predefinedTags = ['学业知识', '自我成长', '一闪一念', '兴趣爱好', '内容创作', 'AI领域', '生活日常', '工作搞钱', '未分类'];
+        const tags = new Set<string>(predefinedTags);
         notes.forEach(note => {
             note.tags?.forEach(tag => tags.add(tag));
         });
@@ -43,10 +44,10 @@ export const QuickNoteModal: React.FC<QuickNoteModalProps> = ({
     }, [notes, searchQuery, selectedTag]);
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="闪念胶囊库" className="max-w-5xl h-[85vh] flex flex-col p-0 overflow-hidden">
+        <Modal isOpen={isOpen} onClose={onClose} title="闪念库" className="max-w-5xl h-[85vh] flex flex-col p-0 overflow-hidden">
             <div className="flex h-full">
                 {/* Sidebar - Tags */}
-                <div className="w-48 md:w-64 bg-slate-50 dark:bg-black/20 border-r border-slate-200 dark:border-white/10 flex flex-col shrink-0">
+                <div className="w-32 md:w-48 bg-slate-50 dark:bg-black/20 border-r border-slate-200 dark:border-white/10 flex flex-col shrink-0">
                     <div className="p-4 border-b border-slate-200 dark:border-white/10">
                         <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">标签分类</h3>
                         <button

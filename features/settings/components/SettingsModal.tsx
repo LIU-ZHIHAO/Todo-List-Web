@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Modal } from '../../shared/components/ui/Modal';
 import { SortConfig, StreamConfig, Task, QuickNote } from '../../core/types';
-import { Settings, Database, Keyboard, Trash2, AlertTriangle } from 'lucide-react';
+import { Settings, Database, Keyboard, Trash2, AlertTriangle, User, LogOut } from 'lucide-react';
+import { useAuth } from '../../core/context/AuthContext';
 import { GeneralSettings } from './sections/GeneralSettings';
 import { DataManagement } from './sections/DataManagement';
 import { ShortcutSettings } from './sections/ShortcutSettings';
@@ -19,7 +20,7 @@ interface SettingsModalProps {
     onImport: (tasks: Task[], notes: QuickNote[]) => void;
 }
 
-type Tab = 'general' | 'data' | 'shortcuts';
+type Tab = 'general' | 'data' | 'shortcuts' | 'account';
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
     isOpen, onClose, config, onUpdate, streamConfig, onUpdateStream,
@@ -27,6 +28,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
     const [activeTab, setActiveTab] = useState<Tab>('general');
     const [confirmDanger, setConfirmDanger] = useState<{ type: 'tasks' | 'notes' | 'all', step: number } | null>(null);
+    const { user, signOut } = useAuth();
 
     const triggerDanger = (type: 'tasks' | 'notes' | 'all') => {
         setConfirmDanger({ type, step: 1 });
@@ -71,6 +73,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}
                     >
                         <Keyboard size={16} /> 快捷键
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('account')}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2
+                            ${activeTab === 'account'
+                                ? 'bg-slate-100 dark:bg-white/10 text-slate-800 dark:text-white'
+                                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                    >
+                        <User size={16} /> 账户
                     </button>
                 </div>
 
@@ -143,6 +154,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                     {activeTab === 'shortcuts' && (
                         <ShortcutSettings />
+                    )}
+
+                    {activeTab === 'account' && (
+                        <div className="space-y-6">
+                            <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-6 border border-slate-200 dark:border-white/10 flex flex-col items-center justify-center gap-4">
+                                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-lg">
+                                    <User size={40} />
+                                </div>
+                                <div className="text-center">
+                                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">{user?.email || '未登录'}</h3>
+                                    <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">当前登录账户</p>
+                                </div>
+                                {user && (
+                                    <button
+                                        onClick={() => { signOut(); onClose(); }}
+                                        className="mt-4 px-6 py-2.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition-all flex items-center gap-2"
+                                    >
+                                        <LogOut size={18} /> 退出登录
+                                    </button>
+                                )}
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>
