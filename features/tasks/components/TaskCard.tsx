@@ -14,11 +14,12 @@ interface TaskCardProps {
     onDragStart?: (e: React.DragEvent, id: string) => void;
     onDrop?: (e: React.DragEvent, targetId: string, position: 'top' | 'bottom') => void;
     variant?: 'default' | 'history';
+    compact?: boolean;
 }
 
 export const TaskCard: React.FC<TaskCardProps> = React.memo(({
     task, onUpdate, onDelete, onEdit, noStrikethrough = false,
-    draggable, onDragStart, onDrop, variant = 'default'
+    draggable, onDragStart, onDrop, variant = 'default', compact = false
 }) => {
     const [isExiting, setIsExiting] = useState(false);
     const [progress, setProgress] = useState(task.progress || 0);
@@ -134,7 +135,7 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
     }
 
     const renderProgressBar = () => (
-        <div className={`${variant === 'history' ? 'w-full md:w-24 md:sm:w-32' : 'w-24 sm:w-32'} h-4 flex items-center gap-[2px] group/progress`} title={`当前进度: ${progress}%`}>
+        <div className={`${(variant === 'history' && !compact) ? 'w-full md:w-24 md:sm:w-32' : 'w-24 sm:w-32'} h-4 flex items-center gap-[2px] group/progress`} title={`当前进度: ${progress}%`}>
             {[20, 40, 60, 80, 100].map((level) => {
                 const isActive = progress >= level;
                 const isFull = level === 100;
@@ -196,7 +197,7 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
             )}
 
             {/* CONTENT LAYOUT - 移动端分行，Web端横向 */}
-            <div className="flex flex-col md:flex-row md:items-start p-2.5 gap-2 md:gap-3 min-h-12">
+            <div className={`flex flex-col ${compact ? '' : 'md:flex-row md:items-start'} p-2.5 gap-2 md:gap-3 min-h-12`}>
 
                 {/* 第一行/左侧：标题、标签等主要信息 */}
                 <div className="flex items-center flex-1 min-w-0 gap-3">
@@ -218,7 +219,7 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
                             {task.title}
                         </h3>
 
-                        {(variant === 'default' || variant === 'history') && (
+                        {(variant === 'default' || variant === 'history') && !compact && (
                             <div className="hidden md:flex flex-1 min-w-0 relative group/desc">
                                 {isEditingDesc ? (
                                     <input
@@ -250,7 +251,7 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
                                 {task.tag}
                             </span>
                         </div>
-                        {(variant === 'default' || variant === 'history') && (
+                        {(variant === 'default' || variant === 'history') && !compact && (
                             <span className={`hidden md:block text-[10px] font-mono pt-[1px] ${task.isOverdue && !task.completed ? 'text-red-500 font-bold' : 'text-slate-400 dark:text-gray-500'}`}>
                                 {task.date}
                             </span>
@@ -259,13 +260,13 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
                 </div>
 
                 {/* 第二行/右侧：进度条和展开按钮 - Web端在右侧，移动端在下方 */}
-                <div className="flex items-center gap-3 flex-shrink-0 md:ml-0 pl-7 md:pl-0">
-                    {variant === 'history' && task.description && (
+                <div className={`flex items-center gap-3 flex-shrink-0 ${compact ? 'pl-7' : 'md:ml-0 pl-7 md:pl-0'}`}>
+                    {variant === 'history' && task.description && !compact && (
                         <p className="md:hidden text-xs text-slate-500 dark:text-gray-500 line-clamp-2 flex-1">{task.description}</p>
                     )}
                     <div className="flex items-center gap-3 flex-shrink-0">
                         {(variant === 'default' || variant === 'history') && (
-                            <span className={`md:hidden text-[10px] font-mono ${task.isOverdue && !task.completed ? 'text-red-500 font-bold' : 'text-slate-400 dark:text-gray-500'}`}>
+                            <span className={`${compact ? '' : 'md:hidden'} text-[10px] font-mono ${task.isOverdue && !task.completed ? 'text-red-500 font-bold' : 'text-slate-400 dark:text-gray-500'}`}>
                                 {task.date}
                             </span>
                         )}

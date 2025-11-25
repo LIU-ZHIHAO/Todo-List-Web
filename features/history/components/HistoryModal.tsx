@@ -4,6 +4,7 @@ import { Task, QuickNote, SortConfig } from '../../core/types';
 import { getLunarDate } from '../../core/utils/lunar';
 import { Modal } from '../../shared/components/ui/Modal';
 import { TaskCard } from '../../tasks/components/TaskCard';
+import { DatePickerPopup } from './DatePickerPopup';
 
 type DateRangeFilter = 'day' | 'week' | 'month' | 'year';
 type StatusFilter = 'all' | 'todo' | 'done';
@@ -237,80 +238,95 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
     }, [tasks, selectedDate, sortConfig]);
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="历史回顾与分析" className="max-w-5xl h-[85vh] flex flex-col">
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
-                <div className="flex bg-slate-100/80 dark:bg-black/20 p-1 rounded-xl border border-slate-200 dark:border-white/10 self-start">
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="历史回顾与分析"
+            className="max-w-5xl h-[85vh] flex flex-col"
+            headerContent={
+                <div className="flex bg-slate-100/80 dark:bg-black/20 p-1 rounded-xl border border-slate-200 dark:border-white/10">
                     <button
                         onClick={() => setViewMode('list')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2
               ${viewMode === 'list' ? 'bg-white dark:bg-blue-600 text-blue-600 dark:text-white shadow-sm' : 'text-slate-500 dark:text-gray-400 hover:text-black dark:hover:text-white'}
             `}
                     >
-                        <List size={16} /> 列表视图
+                        <List size={14} /> 列表视图
                     </button>
                     <button
                         onClick={() => setViewMode('calendar')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2
               ${viewMode === 'calendar' ? 'bg-white dark:bg-blue-600 text-blue-600 dark:text-white shadow-sm' : 'text-slate-500 dark:text-gray-400 hover:text-black dark:hover:text-white'}
             `}
                     >
-                        <CalendarIcon size={16} /> 日历视图
+                        <CalendarIcon size={14} /> 日历视图
                     </button>
                 </div>
-
-                {viewMode === 'list' && (
-                    <div className="flex flex-wrap items-center gap-3 flex-1 justify-end">
-                        <div className="flex flex-col items-start gap-3">
-                            <div className="flex bg-slate-100/80 dark:bg-black/20 p-1 rounded-xl border border-slate-200 dark:border-white/10">
-                                {(['day', 'week', 'month', 'year'] as DateRangeFilter[]).map(r => (
-                                    <button
-                                        key={r}
-                                        onClick={() => { setDateFilter(r); setFilterDate(new Date()); setIsDatePickerOpen(false); }}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap
+            }
+        >
+            {viewMode === 'list' && (
+                <div className="flex flex-col md:flex-row items-center justify-between mb-4 gap-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex bg-slate-100/80 dark:bg-black/20 p-1 rounded-xl border border-slate-200 dark:border-white/10">
+                            {(['day', 'week', 'month', 'year'] as DateRangeFilter[]).map(r => (
+                                <button
+                                    key={r}
+                                    onClick={() => { setDateFilter(r); setFilterDate(new Date()); setIsDatePickerOpen(false); }}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap
                                   ${dateFilter === r ? 'bg-white dark:bg-white/10 text-blue-600 dark:text-blue-300 ring-1 ring-black/5 shadow-sm' : 'text-slate-500 dark:text-gray-500 hover:text-gray-800'}
                               `}
-                                    >
-                                        {DATE_FILTER_LABELS[r]}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="flex items-center bg-white dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 p-1 shadow-sm">
-                                <button onClick={handlePrevRange} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-md text-slate-500">
-                                    <ChevronLeft size={16} />
-                                </button>
-                                <button className="px-3 text-sm font-mono text-blue-600 dark:text-blue-100 min-w-[120px] text-center flex items-center justify-center gap-2">
-                                    <CalendarDays size={14} className="opacity-70" />
-                                    {getRangeLabel()}
-                                </button>
-                                <button onClick={handleNextRange} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-md text-slate-500">
-                                    <ChevronRight size={16} />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="flex bg-slate-100/80 dark:bg-black/20 p-1 rounded-xl border border-slate-200 dark:border-white/10 overflow-x-auto no-scrollbar">
-                            {(['all', 'todo', 'done'] as StatusFilter[]).map(f => (
-                                <button
-                                    key={f}
-                                    onClick={() => setStatusFilter(f)}
-                                    className={`px-2 md:px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1 md:gap-2 whitespace-nowrap flex-shrink-0
-                          ${statusFilter === f ? 'bg-white dark:bg-white/10 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 dark:text-gray-400 hover:text-black dark:hover:text-white'}
-                      `}
                                 >
-                                    {f === 'all' && <BarChart3 size={16} />}
-                                    {f === 'todo' && <Circle size={16} />}
-                                    {f === 'done' && <CheckCircle2 size={16} />}
-                                    <span>{FILTER_LABELS[f]}</span>
-                                    <span className={`ml-1 px-1.5 py-0.5 rounded-md text-[10px] ${statusFilter === f ? 'bg-slate-100 dark:bg-white/20' : 'bg-slate-200/50 dark:bg-white/5'}`}>
-                                        {stats[f]}
-                                    </span>
+                                    {DATE_FILTER_LABELS[r]}
                                 </button>
                             ))}
                         </div>
+
+                        <div className="flex items-center bg-white dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 p-1 shadow-sm relative">
+                            <button onClick={handlePrevRange} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-md text-slate-500">
+                                <ChevronLeft size={16} />
+                            </button>
+                            <button
+                                onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
+                                className="px-3 text-sm font-mono text-blue-600 dark:text-blue-100 min-w-[120px] text-center flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-white/5 rounded transition-colors"
+                            >
+                                <CalendarDays size={14} className="opacity-70" />
+                                {getRangeLabel()}
+                            </button>
+                            <button onClick={handleNextRange} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-md text-slate-500">
+                                <ChevronRight size={16} />
+                            </button>
+
+                            <DatePickerPopup
+                                isOpen={isDatePickerOpen}
+                                onClose={() => setIsDatePickerOpen(false)}
+                                value={filterDate}
+                                onChange={(date) => setFilterDate(date)}
+                                mode={dateFilter}
+                            />
+                        </div>
                     </div>
-                )}
-            </div>
+
+                    <div className="flex bg-slate-100/80 dark:bg-black/20 p-1 rounded-xl border border-slate-200 dark:border-white/10 overflow-x-auto no-scrollbar">
+                        {(['all', 'todo', 'done'] as StatusFilter[]).map(f => (
+                            <button
+                                key={f}
+                                onClick={() => setStatusFilter(f)}
+                                className={`px-2 md:px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1 md:gap-2 whitespace-nowrap flex-shrink-0
+                          ${statusFilter === f ? 'bg-white dark:bg-white/10 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 dark:text-gray-400 hover:text-black dark:hover:text-white'}
+                      `}
+                            >
+                                {f === 'all' && <BarChart3 size={16} />}
+                                {f === 'todo' && <Circle size={16} />}
+                                {f === 'done' && <CheckCircle2 size={16} />}
+                                <span>{FILTER_LABELS[f]}</span>
+                                <span className={`ml-1 px-1.5 py-0.5 rounded-md text-[10px] ${statusFilter === f ? 'bg-slate-100 dark:bg-white/20' : 'bg-slate-200/50 dark:bg-white/5'}`}>
+                                    {stats[f]}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div className="flex-1 overflow-hidden bg-slate-50/50 dark:bg-black/20 rounded-2xl border border-slate-200/50 dark:border-white/5 p-1 relative">
                 {viewMode === 'list' && (
@@ -377,6 +393,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                                                 onDelete={onDelete}
                                                 noStrikethrough={true}
                                                 variant="history"
+                                                compact={true}
                                                 onEdit={onEditTask}
                                             />
                                         ))
