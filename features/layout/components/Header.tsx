@@ -1,18 +1,17 @@
-import React, { useState } from 'react';
-import { LayoutGrid, Library, Sun, Moon, HelpCircle, Info, Settings, Clock, User, LogOut, LogIn, Users } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { LayoutGrid, Library, Sun, Moon, Settings, Clock, User, Users, LogOut } from 'lucide-react';
 import { useUI } from '../../core/context/UIContext';
 import { useAuth } from '../../core/context/AuthContext';
 import { AuthModal } from '../../core/components/AuthModal';
 import { UserManagementModal } from '../../admin/components/UserManagementModal';
 import { useOnlineStatus } from '../../shared/hooks/useOnlineStatus';
+import { useClickOutside } from '../../shared/hooks/useClickOutside';
 
 export const Header = () => {
     const {
         theme, toggleTheme,
         setIsQuickNoteModalOpen,
         setIsHistoryOpen,
-        setIsHelpOpen,
-        setIsAuthorModalOpen,
         setIsSettingsOpen
     } = useUI();
 
@@ -20,14 +19,12 @@ export const Header = () => {
     const isOnline = useOnlineStatus();
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
+    const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+    const profileMenuRef = useRef<HTMLDivElement>(null);
 
-    const handleAuthClick = () => {
-        if (user) {
-            signOut();
-        } else {
-            setIsAuthModalOpen(true);
-        }
-    };
+    useClickOutside(profileMenuRef, () => setIsProfileMenuOpen(false));
+
+
 
     return (
         <>
@@ -43,32 +40,67 @@ export const Header = () => {
 
                 {/* Right Header Controls */}
                 <div className="relative md:absolute md:right-8 md:top-1/2 md:translate-y-1 flex items-center gap-2 md:gap-3">
-                    {/* User Status */}
+                    {/* Profile Menu */}
                     {!loading && user && (
-                        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 group transition-all duration-300 ease-in-out cursor-default">
-                            <User size={14} className="text-blue-600 dark:text-blue-400" />
-                            <div className="max-w-0 overflow-hidden group-hover:max-w-[300px] transition-all duration-500 ease-in-out flex items-center gap-2 opacity-0 group-hover:opacity-100">
-                                <span className="text-xs text-blue-700 dark:text-blue-300 font-medium whitespace-nowrap">
-                                    {user.email}
-                                </span>
-                                {isSuperAdmin && (
-                                    <span className="text-xs bg-purple-500 text-white px-1.5 py-0.5 rounded whitespace-nowrap">
-                                        管理员
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                        <div className="relative" ref={profileMenuRef}>
+                            <button
+                                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-slate-200/50 dark:text-gray-400 dark:hover:text-blue-300 dark:hover:bg-white/5 transition-colors"
+                                title="个人账号"
+                            >
+                                <User size={16} />
+                            </button>
 
-                    {/* User Management Button (Super Admin Only) */}
-                    {isSuperAdmin && (
-                        <button
-                            onClick={() => setIsUserManagementOpen(true)}
-                            className="p-1.5 rounded-lg text-purple-500 hover:text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:text-purple-300 dark:hover:bg-purple-900/20 transition-colors"
-                            title="用户管理"
-                        >
-                            <Users size={16} />
-                        </button>
+                            {isProfileMenuOpen && (
+                                <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-40 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                    {/* User Info Header */}
+                                    <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                                                <User size={20} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                                                    {user.email}
+                                                </p>
+                                                {isSuperAdmin && (
+                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 mt-1">
+                                                        管理员
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Menu Items */}
+                                    <div className="p-1">
+                                        {isSuperAdmin && (
+                                            <button
+                                                onClick={() => {
+                                                    setIsUserManagementOpen(true);
+                                                    setIsProfileMenuOpen(false);
+                                                }}
+                                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
+                                            >
+                                                <Users size={16} />
+                                                用户管理
+                                            </button>
+                                        )}
+
+                                        <button
+                                            onClick={() => {
+                                                signOut();
+                                                setIsProfileMenuOpen(false);
+                                            }}
+                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                        >
+                                            <LogOut size={16} />
+                                            退出登录
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     )}
 
                     <button
@@ -95,17 +127,7 @@ export const Header = () => {
                         {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
                     </button>
 
-                    <button
-                        onClick={() => setIsHelpOpen(true)}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-slate-200/50 dark:text-gray-400 dark:hover:text-blue-300 dark:hover:bg-white/5 transition-colors"
-                        title="使用说明"
-                    >
-                        <HelpCircle size={16} />
-                    </button>
 
-                    <button onClick={() => setIsAuthorModalOpen(true)} className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-slate-200/50 dark:text-gray-400 dark:hover:text-blue-300 dark:hover:bg-white/5 transition-colors" title="志豪的设计作品">
-                        <Info size={16} />
-                    </button>
 
                     <button onClick={() => setIsSettingsOpen(true)} className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-slate-200/50 dark:text-gray-400 dark:hover:text-blue-300 dark:hover:bg-white/5 transition-colors" title="系统设置">
                         <Settings size={16} />

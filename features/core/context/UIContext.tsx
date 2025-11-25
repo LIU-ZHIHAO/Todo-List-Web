@@ -13,14 +13,12 @@ interface UIContextType {
     isHistoryOpen: boolean;
     setIsHistoryOpen: (isOpen: boolean) => void;
 
-    isAuthorModalOpen: boolean;
-    setIsAuthorModalOpen: (isOpen: boolean) => void;
+
 
     isSettingsOpen: boolean;
     setIsSettingsOpen: (isOpen: boolean) => void;
 
-    isHelpOpen: boolean;
-    setIsHelpOpen: (isOpen: boolean) => void;
+
 
     isQuickNoteModalOpen: boolean;
     setIsQuickNoteModalOpen: (isOpen: boolean) => void;
@@ -70,9 +68,9 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [initialContent, setInitialContent] = useState<string | undefined>(undefined);
 
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-    const [isAuthorModalOpen, setIsAuthorModalOpen] = useState(false);
+
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [isHelpOpen, setIsHelpOpen] = useState(false);
+
     const [isQuickNoteModalOpen, setIsQuickNoteModalOpen] = useState(false);
 
     const [convertingNoteId, setConvertingNoteId] = useState<string | null>(null);
@@ -94,9 +92,9 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const closeAllModals = useCallback(() => {
         setIsTaskModalOpen(false);
         setIsHistoryOpen(false);
-        setIsAuthorModalOpen(false);
+
         setIsSettingsOpen(false);
-        setIsHelpOpen(false);
+
         setIsQuickNoteModalOpen(false);
     }, []);
 
@@ -109,12 +107,10 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
             closeTaskModal,
             isHistoryOpen,
             setIsHistoryOpen,
-            isAuthorModalOpen,
-            setIsAuthorModalOpen,
+
             isSettingsOpen,
             setIsSettingsOpen,
-            isHelpOpen,
-            setIsHelpOpen,
+
             isQuickNoteModalOpen,
             setIsQuickNoteModalOpen,
             editingTask,

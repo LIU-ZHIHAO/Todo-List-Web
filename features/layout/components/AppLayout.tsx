@@ -4,8 +4,6 @@ import { DEMO_QUOTES } from '../../core/constants/data';
 import { AddTaskModal } from '../../tasks/components/AddTaskModal';
 import { HistoryModal } from '../../history/components/HistoryModal';
 import { SettingsModal } from '../../settings/components/SettingsModal';
-import { HelpModal } from '../../settings/components/HelpModal';
-import { AuthorModal } from '../../settings/components/AuthorModal';
 import { QuickNoteModal } from '../../quicknotes/components/QuickNoteModal';
 import { InputArea } from '../../quicknotes/components/InputArea';
 import { QuadrantSection } from '../../tasks/components/QuadrantSection';
@@ -23,9 +21,7 @@ export const AppLayout = () => {
     const {
         isTaskModalOpen, openTaskModal, closeTaskModal,
         isHistoryOpen, setIsHistoryOpen,
-        isAuthorModalOpen, setIsAuthorModalOpen,
         isSettingsOpen, setIsSettingsOpen,
-        isHelpOpen, setIsHelpOpen,
         isQuickNoteModalOpen, setIsQuickNoteModalOpen,
         editingTask, initialQuadrant, initialContent,
         convertingNoteId, setConvertingNoteId,
@@ -76,11 +72,7 @@ export const AppLayout = () => {
             alt: true,
             action: () => setIsQuickNoteModalOpen(true)
         },
-        {
-            key: '/',
-            alt: true,
-            action: () => setIsHelpOpen(true)
-        },
+
         {
             key: 'Escape',
             action: closeAllModals
@@ -317,11 +309,7 @@ export const AppLayout = () => {
                 onConvertToTask={handleConvertQuickNoteToTask}
             />
 
-            <AuthorModal
-                isOpen={isAuthorModalOpen}
-                onClose={() => setIsAuthorModalOpen(false)}
-                version={APP_VERSION}
-            />
+
 
             <SettingsModal
                 isOpen={isSettingsOpen}
@@ -336,10 +324,7 @@ export const AppLayout = () => {
                 onImport={handleImportData}
             />
 
-            <HelpModal
-                isOpen={isHelpOpen}
-                onClose={() => setIsHelpOpen(false)}
-            />
+
 
             <AddTaskModal
                 isOpen={isTaskModalOpen}
