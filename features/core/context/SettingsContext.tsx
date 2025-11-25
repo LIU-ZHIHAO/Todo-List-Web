@@ -20,16 +20,16 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     // Stream Config State
     const [streamConfig, setStreamConfig] = useState<StreamConfig>(() => {
-        if (typeof window === 'undefined') return { mode: 'scroll', speed: 50 };
+        if (typeof window === 'undefined') return { speed: 50 };
         const saved = localStorage.getItem('streamConfig');
         try {
             const parsed = saved ? JSON.parse(saved) : null;
-            if (parsed && typeof parsed.speed === 'string') {
-                return { mode: parsed.mode, speed: 50 };
+            if (parsed && typeof parsed.speed === 'number') {
+                return { speed: parsed.speed };
             }
-            return parsed || { mode: 'scroll', speed: 50 };
+            return { speed: 50 };
         } catch (e) {
-            return { mode: 'scroll', speed: 50 };
+            return { speed: 50 };
         }
     });
 

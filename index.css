@@ -7,3 +7,10 @@
     @apply bg-slate-900 text-slate-50;
   }
 }
+
+@layer utilities {
+  .hover-pause:hover .animate-scroll-vertical {
+    animation-play-state: paused !important;
+    -webkit-animation-play-state: paused !important;
+  }
+}

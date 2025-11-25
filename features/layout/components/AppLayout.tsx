@@ -193,7 +193,7 @@ export const AppLayout = () => {
                             <InputArea onAddNote={handleAddQuickNote} />
 
                             {/* Stream - Center always scrolls */}
-                            <div className="w-full h-32 relative overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)] flex items-center hover-pause">
+                            <div className="w-full h-32 relative overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)] flex items-center hover-pause z-10 cursor-default">
                                 <div className="w-full animate-scroll-vertical flex flex-col items-center will-change-transform" style={{ animationDuration: centerScrollDuration }}>
                                     {[...scrollingNotes, ...scrollingNotes].map((item, i) => (
                                         <ScrollingItem
