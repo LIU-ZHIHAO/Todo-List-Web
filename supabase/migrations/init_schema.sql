@@ -14,30 +14,30 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
 );
 
 CREATE TABLE IF NOT EXISTS public.tasks (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     title TEXT NOT NULL,
     description TEXT,
     subtasks JSONB DEFAULT '[]'::jsonb,
     date TEXT,
-    quadrant INTEGER,
+    quadrant TEXT,
     tag TEXT,
     completed TEXT,
     completed_at TIMESTAMPTZ,
     progress INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    "order" INTEGER,
+    "order" BIGINT,
     is_overdue BOOLEAN DEFAULT FALSE,
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid()
 );
 
 CREATE TABLE IF NOT EXISTS public.quick_notes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     content TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     tags JSONB DEFAULT '[]'::jsonb,
-    linked_task_id UUID REFERENCES public.tasks(id) ON DELETE SET NULL,
+    linked_task_id TEXT REFERENCES public.tasks(id) ON DELETE SET NULL,
     is_starred BOOLEAN DEFAULT FALSE,
     color TEXT,
     attachments JSONB DEFAULT '[]'::jsonb,

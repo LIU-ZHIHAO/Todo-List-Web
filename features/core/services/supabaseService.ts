@@ -12,9 +12,9 @@ function convertTaskToSupabase(task: Task, userId?: string): any {
         quadrant: task.quadrant,
         tag: task.tag,
         completed: task.completed,
-        completed_at: task.completedAt,
+        completed_at: task.completedAt ? new Date(task.completedAt).toISOString() : null,
         progress: task.progress,
-        created_at: task.createdAt,
+        created_at: task.createdAt ? new Date(task.createdAt).toISOString() : new Date().toISOString(),
         order: task.order,
         is_overdue: task.isOverdue,
         user_id: userId // 添加 user_id
@@ -31,9 +31,9 @@ function convertTaskFromSupabase(task: any): Task {
         quadrant: task.quadrant,
         tag: task.tag,
         completed: task.completed,
-        completedAt: task.completed_at,
+        completedAt: task.completed_at ? new Date(task.completed_at).getTime() : undefined,
         progress: task.progress,
-        createdAt: task.created_at,
+        createdAt: task.created_at ? new Date(task.created_at).getTime() : Date.now(),
         order: task.order,
         isOverdue: task.is_overdue
     };
@@ -43,7 +43,7 @@ function convertNoteToSupabase(note: QuickNote, userId?: string): any {
     return {
         id: note.id,
         content: note.content,
-        created_at: note.createdAt,
+        created_at: note.createdAt ? new Date(note.createdAt).toISOString() : new Date().toISOString(),
         tags: note.tags || [],
         linked_task_id: note.linkedTaskId,
         is_starred: note.isStarred || false,
@@ -57,7 +57,7 @@ function convertNoteFromSupabase(note: any): QuickNote {
     return {
         id: note.id,
         content: note.content,
-        createdAt: note.created_at,
+        createdAt: note.created_at ? new Date(note.created_at).getTime() : Date.now(),
         tags: note.tags || [],
         linkedTaskId: note.linked_task_id,
         isStarred: note.is_starred || false,
