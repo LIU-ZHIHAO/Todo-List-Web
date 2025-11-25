@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, UserPlus, Shield, User as UserIcon, Trash2, Power, PowerOff, Loader2, AlertCircle, CheckCircle2, Mail, Lock, X } from 'lucide-react';
+import { Users, UserPlus, Shield, User as UserIcon, Trash2, Power, PowerOff, Loader2, AlertCircle, CheckCircle2, Mail, Lock, X, Eye, EyeOff, Edit } from 'lucide-react';
 import { useAuth } from '../../core/context/AuthContext';
 import { authService, UserProfile } from '../../core/services/auth';
 
@@ -26,7 +26,14 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
     // 重置密码状态
     const [resettingUser, setResettingUser] = useState<UserProfile | null>(null);
     const [resetPasswordValue, setResetPasswordValue] = useState('');
+    const [confirmPasswordValue, setConfirmPasswordValue] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [resetting, setResetting] = useState(false);
+
+    // 修改邮箱状态
+    const [editingEmailUser, setEditingEmailUser] = useState<UserProfile | null>(null);
+    const [newEmailValue, setNewEmailValue] = useState('');
+    const [updatingEmail, setUpdatingEmail] = useState(false);
 
     useEffect(() => {
         if (isOpen && isSuperAdmin) {
@@ -145,6 +152,11 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
         e.preventDefault();
         if (!resettingUser) return;
 
+        if (resetPasswordValue !== confirmPasswordValue) {
+            setError('两次输入的密码不一致');
+            return;
+        }
+
         setResetting(true);
         setError(null);
         setSuccess(null);
@@ -159,6 +171,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
                 setSuccess(`用户 ${resettingUser.email} 密码已重置`);
                 setResettingUser(null);
                 setResetPasswordValue('');
+                setConfirmPasswordValue('');
             } else {
                 setError(resetError?.message || '重置密码失败');
             }
@@ -166,6 +179,35 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
             setError(err.message || '重置密码失败');
         } finally {
             setResetting(false);
+        }
+    };
+
+    const handleUpdateEmail = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingEmailUser) return;
+
+        setUpdatingEmail(true);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            const { success: updateSuccess, error: updateError } = await authService.adminUpdateUserEmail(
+                editingEmailUser.id,
+                newEmailValue
+            );
+
+            if (updateSuccess) {
+                setSuccess(`用户邮箱已更新为 ${newEmailValue}`);
+                setEditingEmailUser(null);
+                setNewEmailValue('');
+                await loadUsers();
+            } else {
+                setError(updateError?.message || '更新邮箱失败');
+            }
+        } catch (err: any) {
+            setError(err.message || '更新邮箱失败');
+        } finally {
+            setUpdatingEmail(false);
         }
     };
 
@@ -357,6 +399,16 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
                                                 <span className="font-medium text-gray-900 dark:text-white truncate">
                                                     {user.email}
                                                 </span>
+                                                <button
+                                                    onClick={() => {
+                                                        setEditingEmailUser(user);
+                                                        setNewEmailValue(user.email);
+                                                    }}
+                                                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors text-gray-400 hover:text-blue-500"
+                                                    title="修改邮箱"
+                                                >
+                                                    <Edit size={14} />
+                                                </button>
                                                 {!user.is_active && (
                                                     <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs rounded">
                                                         已停用
@@ -396,7 +448,12 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
                                                 <Trash2 size={16} className="text-red-500" />
                                             </button>
                                             <button
-                                                onClick={() => setResettingUser(user)}
+                                                onClick={() => {
+                                                    setResettingUser(user);
+                                                    setResetPasswordValue('');
+                                                    setConfirmPasswordValue('');
+                                                    setShowPassword(false);
+                                                }}
                                                 className="p-2 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded-lg transition-colors"
                                                 title="重置密码"
                                             >
@@ -440,13 +497,37 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
                                 <div className="relative">
                                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                                     <input
-                                        type="password"
+                                        type={showPassword ? "text" : "password"}
                                         value={resetPasswordValue}
                                         onChange={(e) => setResetPasswordValue(e.target.value)}
                                         required
                                         minLength={6}
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                         placeholder="输入新密码"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                    >
+                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    确认新密码
+                                </label>
+                                <div className="relative">
+                                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        value={confirmPasswordValue}
+                                        onChange={(e) => setConfirmPasswordValue(e.target.value)}
+                                        required
+                                        minLength={6}
+                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        placeholder="再次输入新密码"
                                     />
                                 </div>
                             </div>
@@ -456,6 +537,8 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
                                     onClick={() => {
                                         setResettingUser(null);
                                         setResetPasswordValue('');
+                                        setConfirmPasswordValue('');
+                                        setShowPassword(false);
                                     }}
                                     className="flex-1 px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                                 >
@@ -473,6 +556,61 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
                                         </>
                                     ) : (
                                         <span>确认重置</span>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Email Modal */}
+            {editingEmailUser && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6">
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                            修改邮箱: {editingEmailUser.username || editingEmailUser.email}
+                        </h3>
+                        <form onSubmit={handleUpdateEmail} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    新邮箱地址
+                                </label>
+                                <div className="relative">
+                                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                    <input
+                                        type="email"
+                                        value={newEmailValue}
+                                        onChange={(e) => setNewEmailValue(e.target.value)}
+                                        required
+                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        placeholder="输入新邮箱"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setEditingEmailUser(null);
+                                        setNewEmailValue('');
+                                    }}
+                                    className="flex-1 px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={updatingEmail}
+                                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {updatingEmail ? (
+                                        <>
+                                            <Loader2 size={18} className="animate-spin" />
+                                            <span>更新中...</span>
+                                        </>
+                                    ) : (
+                                        <span>确认修改</span>
                                     )}
                                 </button>
                             </div>

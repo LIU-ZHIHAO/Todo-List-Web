@@ -229,6 +229,27 @@ export const authService = {
     },
 
     /**
+     * 管理员修改用户邮箱
+     */
+    async adminUpdateUserEmail(userId: string, newEmail: string): Promise<{ success: boolean; error: any }> {
+        try {
+            const { data, error } = await supabase.rpc('update_email_by_admin', {
+                target_user_id: userId,
+                new_email: newEmail
+            });
+
+            if (error) throw error;
+            if (!data || !data.success) {
+                throw new Error(data?.message || '更新邮箱失败');
+            }
+
+            return { success: true, error: null };
+        } catch (error) {
+            return { success: false, error };
+        }
+    },
+
+    /**
      * 监听认证状态变化
      */
     onAuthStateChange(callback: (user: User | null, session: Session | null) => void) {
