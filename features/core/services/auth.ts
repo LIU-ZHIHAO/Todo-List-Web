@@ -6,6 +6,7 @@ export type UserRole = 'super_admin' | 'user';
 export interface UserProfile {
     id: string;
     email: string;
+    username?: string;
     role: UserRole;
     created_by: string | null;
     created_at: string;
@@ -20,48 +21,20 @@ export interface AuthResponse {
 
 export const authService = {
     /**
-     * 用户注册（仅供超级管理员使用）
-     */
-    async signUp(email: string, password: string): Promise<AuthResponse> {
-        const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                emailRedirectTo: window.location.origin,
-            }
-        });
-
-        return {
-            user: data.user,
-            error: error as AuthError | null
-        };
-    },
-
-    /**
      * 管理员创建用户
      */
-    async createUserByAdmin(email: string, password: string, role: UserRole = 'user'): Promise<{ success: boolean; error: any }> {
+    async createUserByAdmin(email: string, password: string, username: string, role: UserRole = 'user'): Promise<{ success: boolean; error: any }> {
         try {
-            // 使用 Supabase Admin API 创建用户
-            const { data, error } = await supabase.auth.admin.createUser({
-                email,
-                password,
-                email_confirm: true, // 自动确认邮箱
+            const { data, error } = await supabase.rpc('create_user_by_admin', {
+                new_email: email,
+                new_password: password,
+                new_username: username,
+                new_role: role
             });
 
             if (error) throw error;
-
-            // 更新用户角色
-            if (data.user) {
-                const { error: profileError } = await supabase
-                    .from('user_profiles')
-                    .update({
-                        role,
-                        created_by: (await this.getCurrentUser())?.id
-                    })
-                    .eq('id', data.user.id);
-
-                if (profileError) throw profileError;
+            if (!data || !data.success) {
+                throw new Error(data?.message || '创建用户失败');
             }
 
             return { success: true, error: null };
@@ -71,13 +44,42 @@ export const authService = {
     },
 
     /**
-     * 用户登录
+     * 用户登录 (支持邮箱或用户名)
      */
-    async signIn(email: string, password: string): Promise<AuthResponse> {
+    async signIn(identifier: string, password: string): Promise<AuthResponse> {
+        let email = identifier;
+
+        // 如果不是邮箱格式，尝试通过用户名查找邮箱
+        if (!identifier.includes('@')) {
+            const { data, error } = await supabase.rpc('get_email_by_username', {
+                username_input: identifier
+            });
+
+            if (error || !data) {
+                return {
+                    user: null,
+                    error: { message: '用户名不存在或密码错误' } as AuthError
+                };
+            }
+            email = data;
+        }
+
         const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password,
         });
+
+        // 检查用户是否被停用
+        if (data.user) {
+            const profile = await this.getUserProfile(data.user.id);
+            if (profile && !profile.is_active) {
+                await this.signOut();
+                return {
+                    user: null,
+                    error: { message: '账户已被停用，请联系管理员' } as AuthError
+                };
+            }
+        }
 
         return {
             user: data.user,
@@ -190,18 +192,35 @@ export const authService = {
      */
     async deleteUser(userId: string): Promise<{ success: boolean; error: any }> {
         try {
-            // 删除用户配置
-            const { error: profileError } = await supabase
-                .from('user_profiles')
-                .delete()
-                .eq('id', userId);
+            const { data, error } = await supabase.rpc('delete_user_by_admin', {
+                target_user_id: userId
+            });
 
-            if (profileError) throw profileError;
+            if (error) throw error;
+            if (!data || !data.success) {
+                throw new Error(data?.message || '删除用户失败');
+            }
 
-            // 删除认证用户
-            const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+            return { success: true, error: null };
+        } catch (error) {
+            return { success: false, error };
+        }
+    },
 
-            if (authError) throw authError;
+    /**
+     * 管理员修改用户密码
+     */
+    async adminUpdateUserPassword(userId: string, newPassword: string): Promise<{ success: boolean; error: any }> {
+        try {
+            const { data, error } = await supabase.rpc('update_password_by_admin', {
+                target_user_id: userId,
+                new_password: newPassword
+            });
+
+            if (error) throw error;
+            if (!data || !data.success) {
+                throw new Error(data?.message || '更新密码失败');
+            }
 
             return { success: true, error: null };
         } catch (error) {
@@ -219,7 +238,7 @@ export const authService = {
     },
 
     /**
-     * 重置密码请求
+     * 重置密码请求 (发送邮件)
      */
     async resetPassword(email: string): Promise<{ error: AuthError | null }> {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -229,7 +248,7 @@ export const authService = {
     },
 
     /**
-     * 更新密码
+     * 更新密码 (当前用户)
      */
     async updatePassword(newPassword: string): Promise<{ error: AuthError | null }> {
         const { error } = await supabase.auth.updateUser({

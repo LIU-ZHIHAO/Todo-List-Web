@@ -8,8 +8,7 @@ interface AuthContextType {
     userProfile: UserProfile | null;
     isSuperAdmin: boolean;
     loading: boolean;
-    signUp: (email: string, password: string) => Promise<{ user: User | null; error: any }>;
-    signIn: (email: string, password: string) => Promise<{ user: User | null; error: any }>;
+    signIn: (identifier: string, password: string) => Promise<{ user: User | null; error: any }>;
     signOut: () => Promise<void>;
     refreshProfile: () => Promise<void>;
 }
@@ -25,9 +24,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const refreshProfile = async () => {
         if (user) {
-            const profile = await authService.getUserProfile();
-            setUserProfile(profile);
-            setIsSuperAdmin(profile?.role === 'super_admin' && profile?.is_active === true);
+            try {
+                const profile = await authService.getUserProfile();
+                console.log('[Auth] Fetched profile:', profile);
+
+                setUserProfile(profile);
+
+                const isAdmin = profile?.role === 'super_admin' && profile?.is_active === true;
+                console.log('[Auth] Is Super Admin:', isAdmin, { role: profile?.role, isActive: profile?.is_active });
+
+                setIsSuperAdmin(isAdmin);
+            } catch (err) {
+                console.error('[Auth] Error refreshing profile:', err);
+                setUserProfile(null);
+                setIsSuperAdmin(false);
+            }
         } else {
             setUserProfile(null);
             setIsSuperAdmin(false);
@@ -74,13 +85,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     }, [user]);
 
-    const signUp = async (email: string, password: string) => {
-        const { user, error } = await authService.signUp(email, password);
-        return { user, error };
-    };
-
-    const signIn = async (email: string, password: string) => {
-        const { user, error } = await authService.signIn(email, password);
+    const signIn = async (identifier: string, password: string) => {
+        const { user, error } = await authService.signIn(identifier, password);
         if (user) {
             await refreshProfile();
         }
@@ -102,7 +108,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             userProfile,
             isSuperAdmin,
             loading,
-            signUp,
             signIn,
             signOut,
             refreshProfile

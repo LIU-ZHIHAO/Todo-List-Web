@@ -18,9 +18,15 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
     // 创建用户表单
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [newUserEmail, setNewUserEmail] = useState('');
+    const [newUserUsername, setNewUserUsername] = useState('');
     const [newUserPassword, setNewUserPassword] = useState('');
     const [newUserRole, setNewUserRole] = useState<'user' | 'super_admin'>('user');
     const [creating, setCreating] = useState(false);
+
+    // 重置密码状态
+    const [resettingUser, setResettingUser] = useState<UserProfile | null>(null);
+    const [resetPasswordValue, setResetPasswordValue] = useState('');
+    const [resetting, setResetting] = useState(false);
 
     useEffect(() => {
         if (isOpen && isSuperAdmin) {
@@ -52,12 +58,14 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
             const { success: createSuccess, error: createError } = await authService.createUserByAdmin(
                 newUserEmail,
                 newUserPassword,
+                newUserUsername,
                 newUserRole
             );
 
             if (createSuccess) {
                 setSuccess(`用户 ${newUserEmail} 创建成功！`);
                 setNewUserEmail('');
+                setNewUserUsername('');
                 setNewUserPassword('');
                 setNewUserRole('user');
                 setShowCreateForm(false);
@@ -130,6 +138,34 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
             }
         } catch (err: any) {
             setError(err.message || '删除用户失败');
+        }
+    };
+
+    const handleResetPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!resettingUser) return;
+
+        setResetting(true);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            const { success: resetSuccess, error: resetError } = await authService.adminUpdateUserPassword(
+                resettingUser.id,
+                resetPasswordValue
+            );
+
+            if (resetSuccess) {
+                setSuccess(`用户 ${resettingUser.email} 密码已重置`);
+                setResettingUser(null);
+                setResetPasswordValue('');
+            } else {
+                setError(resetError?.message || '重置密码失败');
+            }
+        } catch (err: any) {
+            setError(err.message || '重置密码失败');
+        } finally {
+            setResetting(false);
         }
     };
 
@@ -207,6 +243,23 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
                     <div className="px-6 pb-4">
                         <form onSubmit={handleCreateUser} className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 space-y-4">
                             <h3 className="font-semibold text-gray-900 dark:text-white">创建新用户</h3>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    用户名
+                                </label>
+                                <div className="relative">
+                                    <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                    <input
+                                        type="text"
+                                        value={newUserUsername}
+                                        onChange={(e) => setNewUserUsername(e.target.value)}
+                                        required
+                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        placeholder="username"
+                                    />
+                                </div>
+                            </div>
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -342,6 +395,13 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
                                             >
                                                 <Trash2 size={16} className="text-red-500" />
                                             </button>
+                                            <button
+                                                onClick={() => setResettingUser(user)}
+                                                className="p-2 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded-lg transition-colors"
+                                                title="重置密码"
+                                            >
+                                                <Lock size={16} className="text-yellow-500" />
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -364,6 +424,62 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen
                     </div>
                 </div>
             </div>
+
+            {/* Reset Password Modal */}
+            {resettingUser && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6">
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                            重置密码: {resettingUser.username || resettingUser.email}
+                        </h3>
+                        <form onSubmit={handleResetPassword} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    新密码
+                                </label>
+                                <div className="relative">
+                                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                    <input
+                                        type="password"
+                                        value={resetPasswordValue}
+                                        onChange={(e) => setResetPasswordValue(e.target.value)}
+                                        required
+                                        minLength={6}
+                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        placeholder="输入新密码"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setResettingUser(null);
+                                        setResetPasswordValue('');
+                                    }}
+                                    className="flex-1 px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={resetting}
+                                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {resetting ? (
+                                        <>
+                                            <Loader2 size={18} className="animate-spin" />
+                                            <span>重置中...</span>
+                                        </>
+                                    ) : (
+                                        <span>确认重置</span>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
