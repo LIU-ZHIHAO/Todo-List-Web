@@ -221,8 +221,8 @@ export const AppLayout = () => {
                                         ))}
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full md:p-4 overflow-hidden relative">
-                                        <div className={`h-full overflow-hidden ${activeMobileQuadrant === Quadrant.Q2 ? 'block' : 'hidden md:block'}`}>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 h-full md:p-4 overflow-hidden relative">
+                                        <div className={`h-full ${activeMobileQuadrant === Quadrant.Q2 ? 'block' : 'hidden md:block'}`}>
                                             <QuadrantSection
                                                 quadrant={Quadrant.Q2}
                                                 tasks={quadrants[Quadrant.Q2]}
@@ -236,7 +236,7 @@ export const AppLayout = () => {
                                                 onDragStart={handleDragStart}
                                             />
                                         </div>
-                                        <div className={`h-full overflow-hidden ${activeMobileQuadrant === Quadrant.Q1 ? 'block' : 'hidden md:block'}`}>
+                                        <div className={`h-full ${activeMobileQuadrant === Quadrant.Q1 ? 'block' : 'hidden md:block'}`}>
                                             <QuadrantSection
                                                 quadrant={Quadrant.Q1}
                                                 tasks={quadrants[Quadrant.Q1]}
@@ -250,7 +250,7 @@ export const AppLayout = () => {
                                                 onDragStart={handleDragStart}
                                             />
                                         </div>
-                                        <div className={`h-full overflow-hidden ${activeMobileQuadrant === Quadrant.Q3 ? 'block' : 'hidden md:block'}`}>
+                                        <div className={`h-full ${activeMobileQuadrant === Quadrant.Q3 ? 'block' : 'hidden md:block'}`}>
                                             <QuadrantSection
                                                 quadrant={Quadrant.Q3}
                                                 tasks={quadrants[Quadrant.Q3]}
@@ -264,7 +264,7 @@ export const AppLayout = () => {
                                                 onDragStart={handleDragStart}
                                             />
                                         </div>
-                                        <div className={`h-full overflow-hidden ${activeMobileQuadrant === Quadrant.Q4 ? 'block' : 'hidden md:block'}`}>
+                                        <div className={`h-full ${activeMobileQuadrant === Quadrant.Q4 ? 'block' : 'hidden md:block'}`}>
                                             <QuadrantSection
                                                 quadrant={Quadrant.Q4}
                                                 tasks={quadrants[Quadrant.Q4]}
