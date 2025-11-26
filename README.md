@@ -21,7 +21,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/10lTwc9da2ZP3gHrL0Qcm-i
 
 ## Supabase Setup
 
-To run this project, you need to set up a Supabase project and configure the database.
+https://supabase.com/ free to person,To run this project, you need to set up a Supabase project and configure the database.
 
 ### 1. Environment Variables
 
