@@ -3,6 +3,7 @@ import { CheckCircle2, Circle, ChevronDown, ChevronUp, Trash2, Plus } from 'luci
 import { Task, Subtask } from '../../core/types';
 import { TAG_COLORS } from '../../core/constants/theme';
 import { generateId } from '../../core/utils/helpers';
+import { triggerConfetti } from '../../core/utils/confetti';
 
 interface TaskCardProps {
     task: Task;
@@ -66,6 +67,7 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
         setProgress(newProgress);
         if (newStatus && !noStrikethrough) {
             const today = new Date().toISOString().split('T')[0];
+            triggerConfetti();
             setIsExiting(true);
             setTimeout(() => {
                 onUpdate({ ...task, completed: today, progress: 100 });
@@ -83,12 +85,14 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({
 
         if (isComplete && !isCurrentlyCompleted && !noStrikethrough) {
             const today = new Date().toISOString().split('T')[0];
+            triggerConfetti();
             setIsExiting(true);
             setTimeout(() => {
                 onUpdate({ ...task, completed: today, progress: newProgress });
             }, 400);
         } else if (isComplete && !isCurrentlyCompleted) {
             const today = new Date().toISOString().split('T')[0];
+            triggerConfetti();
             onUpdate({ ...task, completed: today, progress: newProgress });
         } else if (!isComplete && isCurrentlyCompleted) {
             // Un-complete
