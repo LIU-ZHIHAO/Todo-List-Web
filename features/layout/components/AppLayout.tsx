@@ -52,6 +52,12 @@ export const AppLayout = () => {
         fetchInitialData();
     }, [fetchInitialData]);
 
+    useEffect(() => {
+        if (isHistoryOpen) {
+            loadFullHistory();
+        }
+    }, [isHistoryOpen, loadFullHistory]);
+
     // Keyboard Shortcuts
     useKeyboardShortcuts([
         {

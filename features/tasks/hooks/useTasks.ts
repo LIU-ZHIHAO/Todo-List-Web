@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Task, QuickNote, Quadrant } from '../../core/types';
-import { dbService } from '../../core/services/db';
 import { supabaseService } from '../../core/services/supabaseService';
 import { generateId, checkIsOverdue } from '../../core/utils/helpers';
 import { useOnlineStatus } from '../../shared/hooks/useOnlineStatus';
@@ -31,40 +30,19 @@ export const useTasks = () => {
             // Always try to load from Supabase if online to ensure latest data
             let tasksData: Task[] = [];
             let notesData: QuickNote[] = [];
-            let loadedFromSupabase = false;
 
             if (navigator.onLine) {
                 try {
-                    const [supaTasks, supaNotes] = await Promise.all([
-                        supabaseService.getAllTasks(),
+                    const [activeTasks, allNotes] = await Promise.all([
+                        supabaseService.getActiveTasks(),
                         supabaseService.getAllQuickNotes()
                     ]);
 
-                    if (supaTasks && supaNotes) {
-                        tasksData = supaTasks;
-                        notesData = supaNotes;
-                        loadedFromSupabase = true;
-
-                        // Sync to local DB immediately
-                        await dbService.clearTasks();
-                        await dbService.clearQuickNotes();
-                        // Use Promise.all for faster parallel insertion
-                        await Promise.all([
-                            ...supaTasks.map(t => dbService.updateTask(t)),
-                            ...supaNotes.map(n => dbService.addQuickNote(n))
-                        ]);
-                    }
+                    tasksData = activeTasks;
+                    notesData = allNotes;
                 } catch (e) {
-                    console.error("Supabase load failed, falling back to local", e);
+                    console.error("Supabase load failed", e);
                 }
-            }
-
-            // If offline or Supabase failed, load from local DB
-            if (!loadedFromSupabase) {
-                [tasksData, notesData] = await Promise.all([
-                    dbService.getInitialTasks(),
-                    dbService.getAllQuickNotes()
-                ]);
             }
 
             const today = new Date().toISOString().split('T')[0];
@@ -112,8 +90,7 @@ export const useTasks = () => {
                 }
 
                 if (modified) {
-                    dbService.updateTask(newTask);
-                    if (loadedFromSupabase) supabaseService.updateTask(newTask).catch(console.error);
+                    supabaseService.updateTask(newTask).catch(console.error);
                 }
                 return newTask as Task;
             });
@@ -131,8 +108,13 @@ export const useTasks = () => {
         if (hasLoadedFullHistory) return;
         setSaveStatus('saving');
         try {
-            const allTasks = await dbService.getAllTasks();
-            setTasks(allTasks);
+            const historyTasks = await supabaseService.getHistoryTasks();
+            // Merge history tasks with current active tasks, avoiding duplicates
+            setTasks(prev => {
+                const currentIds = new Set(prev.map(t => t.id));
+                const newTasks = historyTasks.filter(t => !currentIds.has(t.id));
+                return [...prev, ...newTasks];
+            });
             setHasLoadedFullHistory(true);
         } catch (e) {
             console.error("Failed to load history", e);
@@ -160,13 +142,11 @@ export const useTasks = () => {
             if (isEditing) {
                 // Optimistic update
                 setTasks(prev => prev.map(t => t.id === processedTask.id ? processedTask : t));
-                await dbService.updateTask(processedTask);
-                if (navigator.onLine) await supabaseService.updateTask(processedTask);
+                await supabaseService.updateTask(processedTask);
             } else {
                 // Optimistic update
                 setTasks(prev => [processedTask, ...prev]);
-                await dbService.addTask(processedTask);
-                if (navigator.onLine) await supabaseService.addTask(processedTask);
+                await supabaseService.addTask(processedTask);
             }
         };
         // Don't await the operation for UI responsiveness, but track it for save status
@@ -175,8 +155,7 @@ export const useTasks = () => {
 
     const handleTaskDelete = useCallback(async (id: string) => {
         const operation = async () => {
-            await dbService.deleteTask(id);
-            if (navigator.onLine) await supabaseService.deleteTask(id);
+            await supabaseService.deleteTask(id);
             setTasks(prev => prev.filter(t => t.id !== id));
         };
         await withSaveStatus(operation());
@@ -200,8 +179,7 @@ export const useTasks = () => {
         }
 
         const operation = async () => {
-            await dbService.updateTask(processedTask);
-            if (navigator.onLine) await supabaseService.updateTask(processedTask);
+            await supabaseService.updateTask(processedTask);
             setTasks(prev => prev.map(t => t.id === processedTask.id ? processedTask : t));
         };
         await withSaveStatus(operation());
@@ -242,7 +220,6 @@ export const useTasks = () => {
                             }
                         }
 
-                        await dbService.addTask(validTask);
                         if (navigator.onLine) {
                             await supabaseService.addTask(validTask).catch(e => {
                                 console.error('Failed to sync task to Supabase:', e);
@@ -273,7 +250,6 @@ export const useTasks = () => {
                             continue;
                         }
 
-                        await dbService.addQuickNote(validNote);
                         if (navigator.onLine) {
                             await supabaseService.addQuickNote(validNote).catch(e => {
                                 console.error('Failed to sync note to Supabase:', e);
@@ -287,11 +263,11 @@ export const useTasks = () => {
                 }
             }
 
-            const allTasks = await dbService.getAllTasks();
-            const allNotes = await dbService.getAllQuickNotes();
+            const allTasks = await supabaseService.getActiveTasks(); // Re-fetch active only
+            const allNotes = await supabaseService.getAllQuickNotes();
             setTasks(allTasks);
             setQuickNotes(allNotes.sort((a, b) => b.createdAt - a.createdAt));
-            setHasLoadedFullHistory(true);
+            setHasLoadedFullHistory(false); // Reset history loaded state
 
             setTimeout(() => setSaveStatus('saved'), 800);
 
@@ -314,26 +290,33 @@ export const useTasks = () => {
         setSaveStatus('saving');
         try {
             if (type === 'tasks') {
-                await dbService.clearTasks();
                 if (navigator.onLine) {
-                    const allRemote = await supabaseService.getAllTasks();
-                    await Promise.all(allRemote.map(t => supabaseService.deleteTask(t.id)));
+                    const allRemote = await supabaseService.getActiveTasks(); // Only active needed to clear view, but ideally clear all?
+                    // Actually, clearData usually means clear EVERYTHING.
+                    // But deleting all tasks one by one is slow. Supabase doesn't have "delete all".
+                    // For now, let's keep the logic but remove dbService.
+                    // Ideally we should have a backend function for this.
+                    // We will just fetch all and delete.
+                    const allTasks = await supabaseService.getActiveTasks();
+                    const historyTasks = await supabaseService.getHistoryTasks();
+                    const all = [...allTasks, ...historyTasks];
+                    await Promise.all(all.map(t => supabaseService.deleteTask(t.id)));
                 }
                 setTasks([]);
             } else if (type === 'notes') {
-                await dbService.clearQuickNotes();
                 if (navigator.onLine) {
                     const allRemote = await supabaseService.getAllQuickNotes();
                     await Promise.all(allRemote.map(n => supabaseService.deleteQuickNote(n.id)));
                 }
                 setQuickNotes([]);
             } else if (type === 'all') {
-                await dbService.resetDatabase();
                 if (navigator.onLine) {
-                    const [allTasks, allNotes] = await Promise.all([
-                        supabaseService.getAllTasks(),
+                    const [activeTasks, historyTasks, allNotes] = await Promise.all([
+                        supabaseService.getActiveTasks(),
+                        supabaseService.getHistoryTasks(),
                         supabaseService.getAllQuickNotes()
                     ]);
+                    const allTasks = [...activeTasks, ...historyTasks];
                     await Promise.all([
                         ...allTasks.map(t => supabaseService.deleteTask(t.id)),
                         ...allNotes.map(n => supabaseService.deleteQuickNote(n.id))
@@ -360,16 +343,14 @@ export const useTasks = () => {
         const operation = async () => {
             // Optimistic update
             setQuickNotes(prev => [newNote, ...prev]);
-            await dbService.addQuickNote(newNote);
-            if (navigator.onLine) await supabaseService.addQuickNote(newNote);
+            await supabaseService.addQuickNote(newNote);
         };
         withSaveStatus(operation());
     }, [withSaveStatus]);
 
     const handleDeleteQuickNote = useCallback(async (id: string) => {
         const operation = async () => {
-            await dbService.deleteQuickNote(id);
-            if (navigator.onLine) await supabaseService.deleteQuickNote(id);
+            await supabaseService.deleteQuickNote(id);
             setQuickNotes(prev => prev.filter(n => n.id !== id));
         };
         await withSaveStatus(operation());
@@ -377,8 +358,7 @@ export const useTasks = () => {
 
     const handleUpdateQuickNote = useCallback(async (updatedNote: QuickNote) => {
         const operation = async () => {
-            await dbService.updateQuickNote(updatedNote);
-            if (navigator.onLine) await supabaseService.updateQuickNote(updatedNote);
+            await supabaseService.updateQuickNote(updatedNote);
             setQuickNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
         };
         await withSaveStatus(operation());

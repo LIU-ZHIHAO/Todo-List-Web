@@ -74,7 +74,8 @@ async function getCurrentUserId(): Promise<string | null> {
 
 export const supabaseService = {
     // Tasks
-    async getAllTasks(): Promise<Task[]> {
+    // Tasks
+    async getActiveTasks(): Promise<Task[]> {
         const userId = await getCurrentUserId();
         if (!userId) {
             console.warn('No authenticated user, skipping Supabase sync');
@@ -84,7 +85,26 @@ export const supabaseService = {
         const { data, error } = await supabase
             .from('tasks')
             .select('*')
-            .eq('user_id', userId) // 只获取当前用户的数据
+            .eq('user_id', userId)
+            .is('completed', null) // Only fetch incomplete tasks
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return (data || []).map(convertTaskFromSupabase);
+    },
+
+    async getHistoryTasks(): Promise<Task[]> {
+        const userId = await getCurrentUserId();
+        if (!userId) {
+            console.warn('No authenticated user, skipping Supabase sync');
+            return [];
+        }
+
+        const { data, error } = await supabase
+            .from('tasks')
+            .select('*')
+            .eq('user_id', userId)
+            .not('completed', 'is', null) // Only fetch completed tasks
             .order('created_at', { ascending: false });
 
         if (error) throw error;
