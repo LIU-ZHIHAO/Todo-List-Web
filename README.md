@@ -71,4 +71,6 @@ After running this, you can log in with these credentials and create other users
 
 After running this, you can log in with `admin` / `adminadmin` and create other users.
 
+友情打赏：
+![eeed259e380356d455cffbca47f1d671](https://github.com/user-attachments/assets/f9bdc76f-d2e1-4662-b38b-141a45916fea)
 
